@@ -297,16 +297,28 @@ function saveHoldings(holdings) {
 }
 
 function getHolding(ticker) {
-  const holdings = loadHoldings();
-  const shares = Number(holdings[ticker]);
-  return Number.isFinite(shares) && shares > 0 ? shares : 0;
+  const raw = loadHoldings()[ticker];
+  if (raw === undefined || raw === null) return { shares: 0, buyPrice: null };
+  // Back-compat: earlier versions stored a plain share count with no buy price.
+  if (typeof raw === "number") {
+    return { shares: raw > 0 ? raw : 0, buyPrice: null };
+  }
+  const shares = Number(raw.shares);
+  const buyPrice = Number(raw.buyPrice);
+  return {
+    shares: Number.isFinite(shares) && shares > 0 ? shares : 0,
+    buyPrice: Number.isFinite(buyPrice) && buyPrice > 0 ? buyPrice : null,
+  };
 }
 
-function setHolding(ticker, shares) {
+function setHolding(ticker, shares, buyPrice) {
   const holdings = loadHoldings();
-  const n = Number(shares);
-  if (Number.isFinite(n) && n > 0) {
-    holdings[ticker] = n;
+  const sharesNum = Number(shares);
+  const priceNum = Number(buyPrice);
+  const hasShares = Number.isFinite(sharesNum) && sharesNum > 0;
+  const hasPrice = Number.isFinite(priceNum) && priceNum > 0;
+  if (hasShares) {
+    holdings[ticker] = { shares: sharesNum, buyPrice: hasPrice ? priceNum : null };
   } else {
     delete holdings[ticker];
   }

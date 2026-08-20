@@ -156,6 +156,8 @@
     font-size: 11px;
     color: var(--text-dim);
   }
+  .holding-row.pnl-up { color: var(--up); font-weight: 600; }
+  .holding-row.pnl-down { color: var(--down); font-weight: 600; }
   .reversal-badge {
     margin-top: 6px;
     background: rgba(34, 197, 94, 0.15);
@@ -324,22 +326,30 @@
     padding: 4px 8px;
   }
   .manage-row {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .manage-row-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--panel-border);
   }
   .manage-row-main { min-width: 0; flex: 1; }
-  .manage-holding {
-    flex-shrink: 0;
+  .manage-holding-fields {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .manage-holding-field {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
   }
   .manage-holding-input {
-    width: 60px;
+    width: 70px;
     background: var(--bg);
     border: 1px solid var(--panel-border);
     border-radius: 6px;
@@ -348,7 +358,6 @@
     font-size: 13px;
     text-align: right;
   }
-  .manage-holding-unit { font-size: 12px; color: var(--text-dim); }
   .manage-ticker { font-weight: 700; font-size: 14px; }
   .manage-name {
     font-size: 12px;
@@ -527,6 +536,19 @@ function detectReversal(recentCloses) {
   return drawdown >= REVERSAL_MIN_DRAWDOWN && recovery >= REVERSAL_MIN_RECOVERY;
 }
 
+function renderHoldingRow(pick) {
+  const { shares, buyPrice } = getHolding(pick.ticker);
+  if (shares <= 0) return "";
+  if (!buyPrice) {
+    return `<div class="holding-row">保有 ${shares.toLocaleString()}株(評価額 ${formatPrice(shares * pick.price)}) ・ 購入価格未設定</div>`;
+  }
+  const pnl = (pick.price - buyPrice) * shares;
+  const pnlPct = ((pick.price - buyPrice) / buyPrice) * 100;
+  const sign = pnl >= 0 ? "+" : "-";
+  const cls = pnl >= 0 ? "pnl-up" : "pnl-down";
+  return `<div class="holding-row ${cls}">保有 ${shares.toLocaleString()}株 ・ 損益 ${sign}${formatPrice(Math.abs(pnl))} (${sign}${Math.abs(pnlPct).toFixed(1)}%)</div>`;
+}
+
 function renderCard(pick) {
   const score = pick.ml_probability !== null && pick.ml_probability !== undefined
     ? `${(pick.ml_probability * 100).toFixed(1)}%`
@@ -534,9 +556,7 @@ function renderCard(pick) {
   const scoreLabel = pick.ml_probability !== null && pick.ml_probability !== undefined ? "上昇確率" : "スコア";
   const reversalBadge = detectReversal(pick.recent_closes)
     ? `<div class="reversal-badge">📈 反発シグナル(急落からの回復)</div>` : "";
-  const shares = getHolding(pick.ticker);
-  const holdingRow = shares > 0
-    ? `<div class="holding-row">保有: ${shares.toLocaleString()}株(評価額 ${formatPrice(shares * pick.price)})</div>` : "";
+  const holdingRow = renderHoldingRow(pick);
   return `
     <div class="card" data-ticker="${pick.ticker}">
       <div class="rank">${pick.rank}</div>
@@ -767,20 +787,31 @@ function renderManageList() {
     manageListEl.innerHTML = `<div style="color:var(--text-dim);font-size:13px;padding:12px 0;">追跡中の銘柄がありません。</div>`;
     return;
   }
-  manageListEl.innerHTML = tickers.map((t) => `
-    <div class="manage-row">
-      <div class="manage-row-main">
-        <div class="manage-ticker">${t.ticker}</div>
-        <div class="manage-name">${t.name}</div>
+  manageListEl.innerHTML = tickers.map((t) => {
+    const holding = getHolding(t.ticker);
+    return `
+    <div class="manage-row" data-row-ticker="${t.ticker}">
+      <div class="manage-row-top">
+        <div class="manage-row-main">
+          <div class="manage-ticker">${t.ticker}</div>
+          <div class="manage-name">${t.name}</div>
+        </div>
+        <button class="manage-delete-btn" data-ticker="${t.ticker}">削除</button>
       </div>
-      <div class="manage-holding">
-        <input type="number" class="manage-holding-input" data-ticker="${t.ticker}"
-               min="0" step="1" inputmode="numeric" placeholder="株数"
-               value="${getHolding(t.ticker) || ""}">
-        <span class="manage-holding-unit">株</span>
+      <div class="manage-holding-fields">
+        <label class="manage-holding-field">株数
+          <input type="number" class="manage-shares-input" data-ticker="${t.ticker}"
+                 min="0" step="1" inputmode="numeric" placeholder="0"
+                 value="${holding.shares || ""}">
+        </label>
+        <label class="manage-holding-field">購入価格
+          <input type="number" class="manage-buyprice-input" data-ticker="${t.ticker}"
+                 min="0" step="0.01" inputmode="decimal" placeholder="任意"
+                 value="${holding.buyPrice || ""}">
+        </label>
       </div>
-      <button class="manage-delete-btn" data-ticker="${t.ticker}">削除</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 manageToggleBtn.addEventListener("click", () => {
@@ -814,9 +845,13 @@ manageListEl.addEventListener("click", (e) => {
 });
 
 manageListEl.addEventListener("change", (e) => {
-  const input = e.target.closest(".manage-holding-input");
+  const input = e.target.closest(".manage-shares-input, .manage-buyprice-input");
   if (!input) return;
-  setHolding(input.dataset.ticker, input.value);
+  const ticker = input.dataset.ticker;
+  const row = input.closest(".manage-row");
+  const sharesVal = row.querySelector(".manage-shares-input").value;
+  const buyPriceVal = row.querySelector(".manage-buyprice-input").value;
+  setHolding(ticker, sharesVal, buyPriceVal);
   if (latestPayload) render();
 });
 
