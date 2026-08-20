@@ -42,12 +42,6 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload debug keystore (only needed the first time, to commit it)
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-keystore
-          path: android/debug.keystore
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
