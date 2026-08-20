@@ -271,7 +271,7 @@
       <button id="refresh-btn">更新</button>
     </div>
   </div>
-  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作 (build v3)</div>
+  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作 (build v4)</div>
   <form id="add-form">
     <input id="add-ticker-input" type="text" placeholder="銘柄コード 例: 7203" autocomplete="off" inputmode="numeric">
     <button id="add-submit-btn" type="submit">追加</button>
@@ -580,6 +580,8 @@ refreshBtn.addEventListener("click", async () => {
       updatedAtEl.textContent = `取得中 ${i}/${total}: ${ticker}${ok ? "" : "(失敗)"}`;
     });
     showPayload(payload);
+    const t = payload.debug_timing_ms;
+    if (t) alert(`計測: データ取得 ${(t.fetch / 1000).toFixed(1)}秒 / 特徴量計算 ${(t.buildDataset / 1000).toFixed(1)}秒 / 学習 ${(t.train / 1000).toFixed(1)}秒`);
   } catch (e) {
     alert("更新に失敗しました:\n" + (e.stack || e.message));
     if (latestPayload) showPayload(latestPayload);

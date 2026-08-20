@@ -185,14 +185,17 @@ function pickPayload(p) {
 }
 
 async function runUpdate(onProgress) {
+  const t0 = Date.now();
   const tickerEntries = loadTickers();
   const { histories, failures } = await fetchAll(tickerEntries, "2y", "1d", onProgress);
+  const t1 = Date.now();
 
   if (Object.keys(histories).length < 10) {
     throw new Error(`取得できた銘柄が少なすぎます(${Object.keys(histories).length}件)`);
   }
 
   const { trainRows, trainLabels, liveCandidates } = buildDataset(tickerEntries, histories);
+  const t2 = Date.now();
 
   let trainedModel = null;
   if (trainRows.length >= MIN_TRAINING_ROWS) {
@@ -210,6 +213,9 @@ async function runUpdate(onProgress) {
   } else {
     trainedModel = loadModel();
   }
+  const t3 = Date.now();
+
+  console.log(`[timing] fetch=${t1 - t0}ms buildDataset=${t2 - t1}ms train=${t3 - t2}ms`);
 
   const { topRanked, allRanked } = rankCandidates(liveCandidates, trainedModel);
 
@@ -224,6 +230,7 @@ async function runUpdate(onProgress) {
     markets,
     universe,
     fetch_failures: failures,
+    debug_timing_ms: { fetch: t1 - t0, buildDataset: t2 - t1, train: t3 - t2 },
   };
   savePredictions(payload);
   return payload;
