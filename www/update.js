@@ -252,7 +252,15 @@ async function addTicker(rawInput) {
   if (tickers.some((t) => t.ticker === ticker)) throw new Error(`${ticker} は既に追加済みです`);
 
   const name = (await fetchCompanyName(ticker)) || ticker;
-  tickers.push({ ticker, name });
-  saveTickers(tickers);
+  const cleaned = tickers.map(({ market, ...rest }) => rest);
+  cleaned.push({ ticker, name });
+  saveTickers(cleaned);
   return { ticker, name };
+}
+
+function removeTickerFromStorage(ticker) {
+  const cleaned = loadTickers()
+    .filter((t) => t.ticker !== ticker)
+    .map(({ market, ...rest }) => rest);
+  saveTickers(cleaned);
 }
