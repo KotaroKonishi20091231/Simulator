@@ -4,9 +4,8 @@
 // query1.finance.yahoo.com; a plain browser fetch() would be blocked there.
 
 const CHART_URL = (symbol) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
-const RETRY_DELAYS = [0, 2000, 4000, 8000];
-const REQUEST_PAUSE_MIN = 300;
-const REQUEST_PAUSE_MAX = 800;
+const RETRY_DELAYS = [0, 1000, 2000];
+const FETCH_CONCURRENCY = 8;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -105,15 +104,24 @@ async function fetchAll(tickerEntries, range_ = "2y", interval = "1d", onProgres
   const histories = {};
   const failures = [];
   const total = tickerEntries.length;
-  for (let i = 0; i < total; i++) {
-    const { ticker } = tickerEntries[i];
-    try {
-      histories[ticker] = await fetchTickerHistory(ticker, range_, interval);
-    } catch (e) {
-      failures.push({ ticker, error: String(e) });
+  let completed = 0;
+  const queue = tickerEntries.slice();
+
+  async function worker() {
+    while (queue.length) {
+      const entry = queue.shift();
+      const { ticker } = entry;
+      try {
+        histories[ticker] = await fetchTickerHistory(ticker, range_, interval);
+      } catch (e) {
+        failures.push({ ticker, error: String(e) });
+      }
+      completed += 1;
+      if (onProgress) onProgress(ticker, ticker in histories, completed, total);
     }
-    if (onProgress) onProgress(ticker, ticker in histories, i + 1, total);
-    await sleep(REQUEST_PAUSE_MIN + Math.random() * (REQUEST_PAUSE_MAX - REQUEST_PAUSE_MIN));
   }
+
+  const workerCount = Math.min(FETCH_CONCURRENCY, queue.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return { histories, failures };
 }
