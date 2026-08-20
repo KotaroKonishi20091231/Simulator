@@ -493,11 +493,7 @@ function render() {
     listEl.innerHTML = `<div id="status">条件(¥1,500以下)に合う銘柄が見つかりませんでした</div>`;
     return;
   }
-  let html = "";
-  if (latestPayload.fetch_failures && latestPayload.fetch_failures.length > 0) {
-    html += `<div class="fail-note">⚠ ${latestPayload.fetch_failures.length}銘柄の取得に失敗しました</div>`;
-  }
-  html += picks.map((p) => renderCard(p)).join("");
+  let html = picks.map((p) => renderCard(p)).join("");
   listEl.innerHTML = html;
 }
 
