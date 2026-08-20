@@ -526,8 +526,14 @@ document.addEventListener("click", (e) => {
 });
 
 function findPick(ticker) {
-  const list = (latestPayload && latestPayload.universe && latestPayload.universe[MARKET]) || [];
-  return list.find((p) => p.ticker === ticker);
+  if (!latestPayload) return null;
+  const universeList = (latestPayload.universe && latestPayload.universe[MARKET]) || [];
+  const found = universeList.find((p) => p.ticker === ticker);
+  if (found) return found;
+  // Fall back to the watchlist itself, for tickers that no longer qualify
+  // today (e.g. price rose above the threshold) but are still shown.
+  const watchlist = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
+  return watchlist.find((p) => p.ticker === ticker);
 }
 
 function buildChartPoints(dates, closes, width, height) {

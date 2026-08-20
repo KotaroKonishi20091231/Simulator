@@ -2,7 +2,6 @@
 // entirely on-device (no server). Tickers and results persist in localStorage.
 
 const JP_MAX_PRICE = 1500;
-const TOP_N = 15;
 const HOLDOUT_DAYS = 40;
 const MIN_TRAINING_ROWS = 200;
 const RECENT_CHART_POINTS = 90;
@@ -155,7 +154,6 @@ function rankCandidates(liveCandidates, trainedModel) {
     const mlProbability = trainedModel ? predictProba(row, trainedModel) : null;
     byMarket[cand.market].push({ ...cand, mlProbability });
   }
-  const topRanked = {};
   const allRanked = {};
   for (const [mkt, candidates] of Object.entries(byMarket)) {
     candidates.sort((a, b) => {
@@ -165,9 +163,8 @@ function rankCandidates(liveCandidates, trainedModel) {
     });
     candidates.forEach((c, i) => { c.rank = i + 1; });
     allRanked[mkt] = candidates;
-    topRanked[mkt] = candidates.slice(0, TOP_N);
   }
-  return { topRanked, allRanked };
+  return { allRanked };
 }
 
 function pickPayload(p) {
@@ -217,12 +214,32 @@ async function runUpdate(onProgress) {
 
   console.log(`[timing] fetch=${t1 - t0}ms buildDataset=${t2 - t1}ms train=${t3 - t2}ms`);
 
-  const { topRanked, allRanked } = rankCandidates(liveCandidates, trainedModel);
+  const { allRanked } = rankCandidates(liveCandidates, trainedModel);
 
-  const markets = {};
   const universe = {};
-  for (const mkt of Object.keys(topRanked)) markets[mkt] = topRanked[mkt].map(pickPayload);
   for (const mkt of Object.keys(allRanked)) universe[mkt] = allRanked[mkt].map(pickPayload);
+
+  // Accumulating watchlist: once a ticker has appeared here it stays, even if a
+  // later run no longer finds it among today's qualifying candidates (e.g. its
+  // price moved above JP_MAX_PRICE) — it just keeps showing its last known data.
+  // Only genuinely new tickers get inserted, and they go to the front.
+  const previous = loadPredictions();
+  const previousWatchlist = (previous && previous.markets && previous.markets.jp) || [];
+  const trackedTickers = new Set(loadTickers().map((t) => t.ticker));
+
+  const freshPicks = (universe.jp || []).filter((p) => trackedTickers.has(p.ticker));
+  const freshByTicker = new Map(freshPicks.map((p) => [p.ticker, p]));
+
+  const carriedOver = previousWatchlist
+    .filter((p) => trackedTickers.has(p.ticker))
+    .map((old) => freshByTicker.get(old.ticker) || old);
+  const alreadyKnown = new Set(carriedOver.map((p) => p.ticker));
+  const newlyDiscovered = freshPicks.filter((p) => !alreadyKnown.has(p.ticker));
+
+  const watchlist = [...newlyDiscovered, ...carriedOver];
+  watchlist.forEach((p, i) => { p.rank = i + 1; });
+
+  const markets = { jp: watchlist };
 
   const payload = {
     generated_at: new Date().toISOString(),
