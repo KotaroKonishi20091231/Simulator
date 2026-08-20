@@ -26,12 +26,27 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Ensure a fixed debug keystore exists (committed to the repo)
+        run: |
+          if [ ! -f android/debug.keystore ]; then
+            keytool -genkeypair -v -keystore android/debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Debug,O=Debug,C=US"
+          fi
+
       - name: Grant execute permission to gradlew
         run: chmod +x android/gradlew
 
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload debug keystore (only needed the first time, to commit it)
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-keystore
+          path: android/debug.keystore
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
