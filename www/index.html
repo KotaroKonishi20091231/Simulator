@@ -271,7 +271,7 @@
       <button id="refresh-btn">更新</button>
     </div>
   </div>
-  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作</div>
+  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作 (build v3)</div>
   <form id="add-form">
     <input id="add-ticker-input" type="text" placeholder="銘柄コード 例: 7203" autocomplete="off" inputmode="numeric">
     <button id="add-submit-btn" type="submit">追加</button>
@@ -581,7 +581,7 @@ refreshBtn.addEventListener("click", async () => {
     });
     showPayload(payload);
   } catch (e) {
-    alert("更新に失敗しました:\n" + e.message);
+    alert("更新に失敗しました:\n" + (e.stack || e.message));
     if (latestPayload) showPayload(latestPayload);
   } finally {
     refreshBtn.disabled = false;
