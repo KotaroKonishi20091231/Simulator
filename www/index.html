@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Surge Predictor</title>
+<meta name="theme-color" content="#0f172a">
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #16213a;
+    --panel-border: #263352;
+    --text: #e6ebf5;
+    --text-dim: #93a0bd;
+    --up: #22c55e;
+    --down: #ef4444;
+    --accent: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    padding-bottom: 40px;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+    padding: max(12px, env(safe-area-inset-top)) 16px 10px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .subtitle {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  button#refresh-btn {
+    background: var(--accent);
+    color: #06283a;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  button#refresh-btn:disabled { opacity: 0.5; }
+  .header-actions { display: flex; gap: 8px; }
+  button#add-toggle-btn {
+    background: var(--panel);
+    color: var(--accent);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  #add-form {
+    display: none;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  #add-form.open { display: flex; }
+  #add-ticker-input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  #add-submit-btn {
+    background: var(--accent);
+    color: #06283a;
+    border: none;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  #add-submit-btn:disabled { opacity: 0.5; }
+  #add-status {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+  #add-status.error { color: var(--down); }
+  #add-status.ok { color: var(--up); }
+  main { padding: 12px 16px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .card:active { background: #1c2a4a; }
+  .rank {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-dim);
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .card-main { flex: 1; min-width: 0; }
+  .card-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .ticker { font-weight: 700; font-size: 15px; }
+  .name {
+    font-size: 12px;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .price { font-size: 14px; font-weight: 600; text-align: right; }
+  .score-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .score-badge {
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .sparkline { flex-shrink: 0; }
+  #disclaimer {
+    font-size: 11px;
+    color: var(--text-dim);
+    border-top: 1px solid var(--panel-border);
+    margin-top: 16px;
+    padding-top: 12px;
+    line-height: 1.6;
+  }
+  #status {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 40px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .fail-note {
+    font-size: 11px;
+    color: var(--down);
+    margin-bottom: 8px;
+  }
+
+  #detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 20;
+    display: none;
+  }
+  #detail-overlay.open { display: block; }
+  #detail-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 88vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-border);
+    border-radius: 16px 16px 0 0;
+    padding: 16px 18px max(20px, env(safe-area-inset-bottom));
+    z-index: 21;
+    transform: translateY(100%);
+    transition: transform 0.2s ease-out;
+  }
+  #detail-overlay.open #detail-sheet { transform: translateY(0); }
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 4px;
+  }
+  .detail-title { font-size: 20px; font-weight: 700; }
+  .detail-name { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+  #detail-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .detail-chart-wrap { margin: 8px 0 16px; position: relative; }
+  #detail-chart { touch-action: none; }
+  .chart-axis-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  #detail-tooltip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translate(-50%, -100%);
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    display: none;
+    z-index: 5;
+  }
+  .detail-price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+  }
+  .detail-price { font-size: 26px; font-weight: 700; }
+  .detail-score { font-size: 14px; color: var(--accent); font-weight: 600; }
+  .indicator-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .indicator-item {
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  .indicator-label { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
+  .indicator-value { font-size: 15px; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 Surge Predictor</h1>
+  <div class="meta-row">
+    <span id="updated-at">読み込み中...</span>
+    <div class="header-actions">
+      <button id="add-toggle-btn">＋銘柄追加</button>
+      <button id="refresh-btn">更新</button>
+    </div>
+  </div>
+  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作</div>
+  <form id="add-form">
+    <input id="add-ticker-input" type="text" placeholder="銘柄コード 例: 7203" autocomplete="off" inputmode="numeric">
+    <button id="add-submit-btn" type="submit">追加</button>
+  </form>
+  <div id="add-status"></div>
+</header>
+<main>
+  <div id="status">読み込み中...</div>
+  <div id="list" style="display:none"></div>
+  <div id="disclaimer"></div>
+</main>
+
+<div id="detail-overlay">
+  <div id="detail-sheet">
+    <div class="detail-header">
+      <div>
+        <div class="detail-title" id="detail-ticker"></div>
+        <div class="detail-name" id="detail-name"></div>
+      </div>
+      <button id="detail-close">✕</button>
+    </div>
+    <div class="detail-price-row">
+      <span class="detail-price" id="detail-price"></span>
+      <span class="detail-score" id="detail-score"></span>
+    </div>
+    <div class="detail-chart-wrap">
+      <div id="detail-tooltip"></div>
+      <svg id="detail-chart" width="100%" height="120" viewBox="0 0 300 120" preserveAspectRatio="none">
+        <path id="detail-chart-path" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <line id="detail-crosshair" x1="0" x2="0" y1="0" y2="120" stroke="#93a0bd" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>
+        <circle id="detail-dot" r="3.5" fill="#38bdf8" visibility="hidden"/>
+      </svg>
+      <div class="chart-axis-row">
+        <span id="detail-date-start"></span>
+        <span id="detail-date-end"></span>
+      </div>
+    </div>
+    <div class="indicator-grid" id="detail-indicators"></div>
+  </div>
+</div>
+
+<script src="indicators.js"></script>
+<script src="model.js"></script>
+<script src="heuristic.js"></script>
+<script src="fetchData.js"></script>
+<script src="update.js"></script>
+<script>
+const MARKET = "jp";
+
+const listEl = document.getElementById("list");
+const statusEl = document.getElementById("status");
+const updatedAtEl = document.getElementById("updated-at");
+const disclaimerEl = document.getElementById("disclaimer");
+const refreshBtn = document.getElementById("refresh-btn");
+
+let latestPayload = null;
+
+const INDICATOR_LABELS = {
+  rsi14: "RSI (14日)",
+  macd_hist: "MACDヒストグラム",
+  pct_from_sma20: "20日線乖離率 %",
+  pct_from_sma50: "50日線乖離率 %",
+  pct_from_sma200: "200日線乖離率 %",
+  roc20: "20日変化率(ROC) %",
+  volume_ratio20: "出来高倍率(20日平均比)",
+  bollinger_pct_b: "ボリンジャー %B",
+  atr_pct: "ATR(値動きの荒さ) %",
+  pct_off_52w_high: "52週高値からの乖離率 %",
+};
+
+function sparklinePath(closes, width, height) {
+  const valid = closes.filter((c) => c !== null && c !== undefined);
+  if (valid.length < 2) return { path: "", up: true };
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const range = max - min || 1;
+  const stepX = width / (closes.length - 1);
+  const points = closes.map((c, i) => {
+    const v = c === null || c === undefined ? null : c;
+    const y = v === null ? null : height - ((v - min) / range) * height;
+    return [i * stepX, y];
+  }).filter(([, y]) => y !== null);
+  const path = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const up = valid[valid.length - 1] >= valid[0];
+  return { path, up };
+}
+
+function renderSparkline(closes) {
+  const width = 72, height = 28;
+  const { path, up } = sparklinePath(closes, width, height);
+  const color = up ? "var(--up)" : "var(--down)";
+  return `<svg class="sparkline" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function formatPrice(price) {
+  return `¥${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function renderCard(pick) {
+  const score = pick.ml_probability !== null && pick.ml_probability !== undefined
+    ? `${(pick.ml_probability * 100).toFixed(1)}%`
+    : `${pick.heuristic_score.toFixed(0)}/100`;
+  const scoreLabel = pick.ml_probability !== null && pick.ml_probability !== undefined ? "上昇確率" : "スコア";
+  return `
+    <div class="card" data-ticker="${pick.ticker}">
+      <div class="rank">${pick.rank}</div>
+      ${renderSparkline(pick.recent_closes)}
+      <div class="card-main">
+        <div class="card-title">
+          <span class="ticker">${pick.ticker}</span>
+          <span class="price">${formatPrice(pick.price)}</span>
+        </div>
+        <div class="name">${pick.name}</div>
+        <div class="score-row">
+          <span>${scoreLabel} <span class="score-badge">${score}</span></span>
+          <span>RSI ${pick.indicators.rsi14.toFixed(0)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function render() {
+  if (!latestPayload) return;
+  const picks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
+  if (picks.length === 0) {
+    listEl.innerHTML = `<div id="status">条件(¥1,500以下)に合う銘柄が見つかりませんでした</div>`;
+    return;
+  }
+  let html = "";
+  if (latestPayload.fetch_failures && latestPayload.fetch_failures.length > 0) {
+    html += `<div class="fail-note">⚠ ${latestPayload.fetch_failures.length}銘柄の取得に失敗しました</div>`;
+  }
+  html += picks.map((p) => renderCard(p)).join("");
+  listEl.innerHTML = html;
+}
+
+function showPayload(payload) {
+  latestPayload = payload;
+  const generated = new Date(payload.generated_at);
+  updatedAtEl.textContent = `最終更新: ${generated.toLocaleString("ja-JP")}`;
+  disclaimerEl.textContent = payload.disclaimer;
+  statusEl.style.display = "none";
+  listEl.style.display = "block";
+  render();
+}
+
+function initFromCache() {
+  const cached = loadPredictions();
+  if (cached) {
+    showPayload(cached);
+  } else {
+    statusEl.textContent = "まだデータがありません。「更新」を押して取得してください(1分程度かかります)。";
+  }
+}
+
+document.addEventListener("click", (e) => {
+  const card = e.target.closest(".card[data-ticker]");
+  if (card) openDetail(card.dataset.ticker);
+});
+
+function findPick(ticker) {
+  const list = (latestPayload && latestPayload.universe && latestPayload.universe[MARKET]) || [];
+  return list.find((p) => p.ticker === ticker);
+}
+
+function buildChartPoints(dates, closes, width, height) {
+  const validIdx = [];
+  closes.forEach((c, i) => { if (c !== null && c !== undefined) validIdx.push(i); });
+  if (validIdx.length < 2) return [];
+  const validCloses = validIdx.map((i) => closes[i]);
+  const min = Math.min(...validCloses);
+  const max = Math.max(...validCloses);
+  const range = max - min || 1;
+  const stepX = width / (closes.length - 1);
+  return validIdx.map((i) => ({
+    x: i * stepX,
+    y: height - ((closes[i] - min) / range) * height,
+    date: dates[i],
+    close: closes[i],
+  }));
+}
+
+function pathFromPoints(points) {
+  return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+}
+
+function formatDetailDate(iso) {
+  const parts = (iso || "").split("-");
+  return parts.length === 3 ? `${parts[1]}/${parts[2]}` : iso;
+}
+
+let currentChartPoints = [];
+let chartDragging = false;
+const chartSvgEl = document.getElementById("detail-chart");
+const chartPathEl = document.getElementById("detail-chart-path");
+const chartCrosshairEl = document.getElementById("detail-crosshair");
+const chartDotEl = document.getElementById("detail-dot");
+const chartTooltipEl = document.getElementById("detail-tooltip");
+
+function nearestChartPoint(svgX) {
+  if (currentChartPoints.length === 0) return null;
+  let nearest = currentChartPoints[0];
+  let bestDist = Math.abs(nearest.x - svgX);
+  for (const p of currentChartPoints) {
+    const d = Math.abs(p.x - svgX);
+    if (d < bestDist) { bestDist = d; nearest = p; }
+  }
+  return nearest;
+}
+
+function showChartCrosshairAt(point) {
+  chartCrosshairEl.setAttribute("x1", point.x);
+  chartCrosshairEl.setAttribute("x2", point.x);
+  chartCrosshairEl.setAttribute("visibility", "visible");
+  chartDotEl.setAttribute("cx", point.x);
+  chartDotEl.setAttribute("cy", point.y);
+  chartDotEl.setAttribute("visibility", "visible");
+
+  const rect = chartSvgEl.getBoundingClientRect();
+  chartTooltipEl.style.left = `${(point.x / 300) * rect.width}px`;
+  chartTooltipEl.style.top = `${(point.y / 120) * rect.height}px`;
+  chartTooltipEl.textContent = `${formatDetailDate(point.date)}  ${formatPrice(point.close)}`;
+  chartTooltipEl.style.display = "block";
+}
+
+function hideChartCrosshair() {
+  chartCrosshairEl.setAttribute("visibility", "hidden");
+  chartDotEl.setAttribute("visibility", "hidden");
+  chartTooltipEl.style.display = "none";
+}
+
+function handleChartPointer(clientX) {
+  const rect = chartSvgEl.getBoundingClientRect();
+  const ratio = (clientX - rect.left) / rect.width;
+  const svgX = Math.max(0, Math.min(300, ratio * 300));
+  const point = nearestChartPoint(svgX);
+  if (point) showChartCrosshairAt(point);
+}
+
+chartSvgEl.addEventListener("pointerdown", (e) => {
+  chartDragging = true;
+  chartSvgEl.setPointerCapture(e.pointerId);
+  handleChartPointer(e.clientX);
+});
+chartSvgEl.addEventListener("pointermove", (e) => {
+  if (chartDragging) handleChartPointer(e.clientX);
+});
+chartSvgEl.addEventListener("pointerup", () => { chartDragging = false; hideChartCrosshair(); });
+chartSvgEl.addEventListener("pointercancel", () => { chartDragging = false; hideChartCrosshair(); });
+
+function openDetail(ticker) {
+  const pick = findPick(ticker);
+  if (!pick) return;
+
+  document.getElementById("detail-ticker").textContent = pick.ticker;
+  document.getElementById("detail-name").textContent = pick.name;
+  document.getElementById("detail-price").textContent = formatPrice(pick.price);
+  document.getElementById("detail-score").textContent =
+    pick.ml_probability !== null && pick.ml_probability !== undefined
+      ? `上昇確率 ${(pick.ml_probability * 100).toFixed(1)}%`
+      : `スコア ${pick.heuristic_score.toFixed(0)}/100`;
+
+  const dates = pick.recent_dates || [];
+  currentChartPoints = buildChartPoints(dates, pick.recent_closes, 300, 120);
+  hideChartCrosshair();
+  const up = currentChartPoints.length > 1
+    ? currentChartPoints[currentChartPoints.length - 1].close >= currentChartPoints[0].close
+    : true;
+  chartPathEl.setAttribute("d", pathFromPoints(currentChartPoints));
+  chartPathEl.setAttribute("stroke", up ? "var(--up)" : "var(--down)");
+  document.getElementById("detail-date-start").textContent = dates[0] || "";
+  document.getElementById("detail-date-end").textContent = dates[dates.length - 1] || "";
+
+  document.getElementById("detail-indicators").innerHTML = Object.entries(INDICATOR_LABELS)
+    .map(([key, label]) => `
+      <div class="indicator-item">
+        <div class="indicator-label">${label}</div>
+        <div class="indicator-value">${pick.indicators[key].toFixed(2)}</div>
+      </div>`)
+    .join("");
+
+  history.pushState({ detail: true }, "");
+  document.getElementById("detail-overlay").classList.add("open");
+}
+
+function closeDetail(fromPopstate) {
+  document.getElementById("detail-overlay").classList.remove("open");
+  hideChartCrosshair();
+  if (!fromPopstate) history.back();
+}
+
+window.addEventListener("popstate", () => closeDetail(true));
+document.getElementById("detail-close").addEventListener("click", () => closeDetail(false));
+document.getElementById("detail-overlay").addEventListener("click", (e) => {
+  if (e.target.id === "detail-overlay") closeDetail(false);
+});
+
+refreshBtn.addEventListener("click", async () => {
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = "更新中...";
+  statusEl.style.display = latestPayload ? "none" : "block";
+  try {
+    const payload = await runUpdate((ticker, ok, i, total) => {
+      updatedAtEl.textContent = `取得中 ${i}/${total}: ${ticker}${ok ? "" : "(失敗)"}`;
+    });
+    showPayload(payload);
+  } catch (e) {
+    alert("更新に失敗しました:\n" + e.message);
+    if (latestPayload) showPayload(latestPayload);
+  } finally {
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = "更新";
+  }
+});
+
+const addToggleBtn = document.getElementById("add-toggle-btn");
+const addFormEl = document.getElementById("add-form");
+const addTickerInput = document.getElementById("add-ticker-input");
+const addSubmitBtn = document.getElementById("add-submit-btn");
+const addStatusEl = document.getElementById("add-status");
+
+addToggleBtn.addEventListener("click", () => {
+  addFormEl.classList.toggle("open");
+  if (addFormEl.classList.contains("open")) addTickerInput.focus();
+});
+
+addFormEl.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const raw = addTickerInput.value.trim();
+  if (!raw) return;
+
+  addSubmitBtn.disabled = true;
+  addSubmitBtn.textContent = "追加中...";
+  addStatusEl.className = "";
+  addStatusEl.textContent = "銘柄名を取得しています...";
+
+  try {
+    const added = await addTicker(raw);
+    addStatusEl.textContent = `${added.name} を追加しました。データを取得・再計算しています(1分程度)...`;
+    const payload = await runUpdate((ticker, ok, i, total) => {
+      addStatusEl.textContent = `取得中 ${i}/${total}: ${ticker}${ok ? "" : "(失敗)"}`;
+    });
+    showPayload(payload);
+    addStatusEl.className = "ok";
+    addStatusEl.textContent = `${added.name} を追加しました。`;
+    addTickerInput.value = "";
+  } catch (e) {
+    addStatusEl.className = "error";
+    addStatusEl.textContent = e.message || "追加に失敗しました。";
+  } finally {
+    addSubmitBtn.disabled = false;
+    addSubmitBtn.textContent = "追加";
+  }
+});
+
+initFromCache();
+</script>
+</body>
+</html>

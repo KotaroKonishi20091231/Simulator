@@ -1,0 +1,10 @@
+{
+  "appId": "com.kotarokonishi.surgepredictor",
+  "appName": "Surge Predictor",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
