@@ -52,12 +52,18 @@ const DEFAULT_TICKERS = [
 ];
 
 function loadTickers() {
+  let list;
   try {
     const raw = localStorage.getItem(TICKERS_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) { /* fall through to defaults */ }
-  saveTickers(DEFAULT_TICKERS);
-  return DEFAULT_TICKERS.slice();
+    list = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    list = null;
+  }
+  if (!list) {
+    saveTickers(DEFAULT_TICKERS);
+    list = DEFAULT_TICKERS;
+  }
+  return list.map((entry) => ({ ...entry, market: "jp" }));
 }
 
 function saveTickers(list) {
