@@ -213,8 +213,15 @@
     line-height: 1;
     padding: 4px 8px;
   }
-  .detail-chart-wrap { margin: 8px 0 16px; position: relative; }
+  .detail-chart-wrap { margin: 30px 0 16px; position: relative; }
   #detail-chart { touch-action: none; }
+  .chart-price-range {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
   .chart-axis-row {
     display: flex;
     justify-content: space-between;
@@ -224,9 +231,9 @@
   }
   #detail-tooltip {
     position: absolute;
-    top: 0;
+    top: -26px;
     left: 0;
-    transform: translate(-50%, -100%);
+    transform: translateX(-50%);
     background: var(--bg);
     border: 1px solid var(--panel-border);
     border-radius: 6px;
@@ -366,6 +373,10 @@
     <div class="detail-price-row">
       <span class="detail-price" id="detail-price"></span>
       <span class="detail-score" id="detail-score"></span>
+    </div>
+    <div class="chart-price-range">
+      <span id="detail-price-max"></span>
+      <span id="detail-price-min"></span>
     </div>
     <div class="detail-chart-wrap">
       <div id="detail-tooltip"></div>
@@ -573,10 +584,13 @@ function showChartCrosshairAt(point) {
   chartDotEl.setAttribute("visibility", "visible");
 
   const rect = chartSvgEl.getBoundingClientRect();
-  chartTooltipEl.style.left = `${(point.x / 300) * rect.width}px`;
-  chartTooltipEl.style.top = `${(point.y / 120) * rect.height}px`;
   chartTooltipEl.textContent = `${formatDetailDate(point.date)}  ${formatPrice(point.close)}`;
   chartTooltipEl.style.display = "block";
+  // Clamp so the tooltip (fixed just above the chart) never spills past its edges.
+  const halfWidth = chartTooltipEl.offsetWidth / 2;
+  const rawLeft = (point.x / 300) * rect.width;
+  const clampedLeft = Math.max(halfWidth, Math.min(rect.width - halfWidth, rawLeft));
+  chartTooltipEl.style.left = `${clampedLeft}px`;
 }
 
 function hideChartCrosshair() {
@@ -624,8 +638,17 @@ function openDetail(ticker) {
     : true;
   chartPathEl.setAttribute("d", pathFromPoints(currentChartPoints));
   chartPathEl.setAttribute("stroke", up ? "var(--up)" : "var(--down)");
-  document.getElementById("detail-date-start").textContent = dates[0] || "";
-  document.getElementById("detail-date-end").textContent = dates[dates.length - 1] || "";
+  document.getElementById("detail-date-start").textContent = formatDetailDate(dates[0]);
+  document.getElementById("detail-date-end").textContent = formatDetailDate(dates[dates.length - 1]);
+
+  if (currentChartPoints.length > 0) {
+    const closeVals = currentChartPoints.map((p) => p.close);
+    document.getElementById("detail-price-max").textContent = `高 ${formatPrice(Math.max(...closeVals))}`;
+    document.getElementById("detail-price-min").textContent = `安 ${formatPrice(Math.min(...closeVals))}`;
+  } else {
+    document.getElementById("detail-price-max").textContent = "";
+    document.getElementById("detail-price-min").textContent = "";
+  }
 
   document.getElementById("detail-indicators").innerHTML = Object.entries(INDICATOR_LABELS)
     .map(([key, label]) => `
