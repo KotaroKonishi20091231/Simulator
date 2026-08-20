@@ -151,6 +151,11 @@
     font-weight: 700;
     color: var(--accent);
   }
+  .holding-row {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
   .reversal-badge {
     margin-top: 6px;
     background: rgba(34, 197, 94, 0.15);
@@ -326,7 +331,24 @@
     padding: 10px 0;
     border-bottom: 1px solid var(--panel-border);
   }
-  .manage-row-main { min-width: 0; }
+  .manage-row-main { min-width: 0; flex: 1; }
+  .manage-holding {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .manage-holding-input {
+    width: 60px;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 5px 6px;
+    color: var(--text);
+    font-size: 13px;
+    text-align: right;
+  }
+  .manage-holding-unit { font-size: 12px; color: var(--text-dim); }
   .manage-ticker { font-weight: 700; font-size: 14px; }
   .manage-name {
     font-size: 12px;
@@ -512,6 +534,9 @@ function renderCard(pick) {
   const scoreLabel = pick.ml_probability !== null && pick.ml_probability !== undefined ? "上昇確率" : "スコア";
   const reversalBadge = detectReversal(pick.recent_closes)
     ? `<div class="reversal-badge">📈 反発シグナル(急落からの回復)</div>` : "";
+  const shares = getHolding(pick.ticker);
+  const holdingRow = shares > 0
+    ? `<div class="holding-row">保有: ${shares.toLocaleString()}株(評価額 ${formatPrice(shares * pick.price)})</div>` : "";
   return `
     <div class="card" data-ticker="${pick.ticker}">
       <div class="rank">${pick.rank}</div>
@@ -526,6 +551,7 @@ function renderCard(pick) {
           <span>${scoreLabel} <span class="score-badge">${score}</span></span>
           <span>RSI ${pick.indicators.rsi14.toFixed(0)}</span>
         </div>
+        ${holdingRow}
         ${reversalBadge}
       </div>
     </div>`;
@@ -747,6 +773,12 @@ function renderManageList() {
         <div class="manage-ticker">${t.ticker}</div>
         <div class="manage-name">${t.name}</div>
       </div>
+      <div class="manage-holding">
+        <input type="number" class="manage-holding-input" data-ticker="${t.ticker}"
+               min="0" step="1" inputmode="numeric" placeholder="株数"
+               value="${getHolding(t.ticker) || ""}">
+        <span class="manage-holding-unit">株</span>
+      </div>
       <button class="manage-delete-btn" data-ticker="${t.ticker}">削除</button>
     </div>`).join("");
 }
@@ -779,6 +811,13 @@ manageListEl.addEventListener("click", (e) => {
     render();
   }
   renderManageList();
+});
+
+manageListEl.addEventListener("change", (e) => {
+  const input = e.target.closest(".manage-holding-input");
+  if (!input) return;
+  setHolding(input.dataset.ticker, input.value);
+  if (latestPayload) render();
 });
 
 async function runRefresh(silent) {

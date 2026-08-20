@@ -10,6 +10,7 @@ const SURGE_THRESHOLD = 0.08;
 
 const TICKERS_STORAGE_KEY = "surge_predictor_tickers";
 const PREDICTIONS_STORAGE_KEY = "surge_predictor_predictions";
+const HOLDINGS_STORAGE_KEY = "surge_predictor_holdings";
 const JP_TICKER_RE = /^[0-9A-Za-z]{3,5}\.T$/;
 
 const DISCLAIMER = "本ツールは統計的・技術的分析に基づく実験的な予測であり、投資助言ではありません。" +
@@ -280,4 +281,34 @@ function removeTickerFromStorage(ticker) {
     .filter((t) => t.ticker !== ticker)
     .map(({ market, ...rest }) => rest);
   saveTickers(cleaned);
+}
+
+function loadHoldings() {
+  try {
+    const raw = localStorage.getItem(HOLDINGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveHoldings(holdings) {
+  try { localStorage.setItem(HOLDINGS_STORAGE_KEY, JSON.stringify(holdings)); } catch (e) { /* ignore */ }
+}
+
+function getHolding(ticker) {
+  const holdings = loadHoldings();
+  const shares = Number(holdings[ticker]);
+  return Number.isFinite(shares) && shares > 0 ? shares : 0;
+}
+
+function setHolding(ticker, shares) {
+  const holdings = loadHoldings();
+  const n = Number(shares);
+  if (Number.isFinite(n) && n > 0) {
+    holdings[ticker] = n;
+  } else {
+    delete holdings[ticker];
+  }
+  saveHoldings(holdings);
 }
