@@ -15,29 +15,43 @@
     --up: #22c55e;
     --down: #ef4444;
     --accent: #38bdf8;
+    --accent-2: #818cf8;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--bg);
+    background:
+      radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.10), transparent 45%),
+      radial-gradient(circle at 100% 15%, rgba(129, 140, 248, 0.08), transparent 40%),
+      var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
     padding-bottom: 40px;
+    -webkit-font-smoothing: antialiased;
   }
   header {
     position: sticky;
     top: 0;
-    background: var(--bg);
+    background: linear-gradient(180deg, rgba(22, 33, 58, 0.97), rgba(15, 23, 42, 0.97));
+    backdrop-filter: blur(6px);
     z-index: 10;
-    padding: max(12px, env(safe-area-inset-top)) 16px 10px;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
     border-bottom: 1px solid var(--panel-border);
+    box-shadow: var(--shadow-sm);
   }
   h1 {
-    font-size: 18px;
-    margin: 0 0 8px;
+    font-size: 19px;
+    letter-spacing: 0.2px;
+    margin: 0 0 10px;
     display: flex;
     align-items: center;
     gap: 8px;
+    background: linear-gradient(90deg, var(--text), var(--accent-2) 140%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   .meta-row {
     display: flex;
@@ -51,23 +65,26 @@
     color: var(--text-dim);
     margin-top: 2px;
   }
+  button { transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease; }
+  button:active { transform: scale(0.96); }
   button#refresh-btn {
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
     color: #06283a;
     border: none;
-    border-radius: 8px;
-    padding: 6px 12px;
+    border-radius: 999px;
+    padding: 7px 16px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: var(--shadow-sm);
   }
-  button#refresh-btn:disabled { opacity: 0.5; }
+  button#refresh-btn:disabled { opacity: 0.5; box-shadow: none; }
   .header-actions { display: flex; gap: 8px; }
-  button#add-toggle-btn {
+  button#add-toggle-btn, button#manage-toggle-btn {
     background: var(--panel);
     color: var(--accent);
     border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 6px 12px;
+    border-radius: 999px;
+    padding: 7px 14px;
     font-size: 13px;
     font-weight: 600;
   }
@@ -87,13 +104,14 @@
     font-size: 14px;
   }
   #add-submit-btn {
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
     color: #06283a;
     border: none;
-    border-radius: 8px;
-    padding: 0 14px;
+    border-radius: 999px;
+    padding: 0 16px;
     font-weight: 700;
     font-size: 13px;
+    box-shadow: var(--shadow-sm);
   }
   #add-submit-btn:disabled { opacity: 0.5; }
   #add-status {
@@ -105,24 +123,31 @@
   #add-status.ok { color: var(--up); }
   main { padding: 12px 16px; }
   .card {
-    background: var(--panel);
+    background: linear-gradient(160deg, var(--panel), #141d34);
     border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 12px 14px;
+    border-radius: 14px;
+    padding: 13px 14px;
     margin-bottom: 10px;
     display: flex;
     align-items: center;
     gap: 12px;
     cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   }
-  .card:active { background: #1c2a4a; }
+  .card:active { background: #1c2a4a; transform: scale(0.985); box-shadow: none; }
   .rank {
-    font-size: 18px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--text-dim);
-    width: 24px;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
     text-align: center;
     flex-shrink: 0;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 50%;
   }
   .card-main { flex: 1; min-width: 0; }
   .card-title {
@@ -150,6 +175,10 @@
   .score-badge {
     font-weight: 700;
     color: var(--accent);
+    background: rgba(56, 189, 248, 0.14);
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-left: 2px;
   }
   .holding-row {
     margin-top: 6px;
@@ -159,12 +188,13 @@
   .holding-row.pnl-up { color: var(--up); font-weight: 600; }
   .holding-row.pnl-down { color: var(--down); font-weight: 600; }
   .reversal-badge {
-    margin-top: 6px;
+    margin-top: 7px;
+    display: inline-block;
     background: rgba(34, 197, 94, 0.15);
     color: var(--up);
-    border: 1px solid var(--up);
-    border-radius: 6px;
-    padding: 4px 8px;
+    border: 1px solid rgba(34, 197, 94, 0.5);
+    border-radius: 999px;
+    padding: 4px 10px;
     font-size: 11px;
     font-weight: 700;
   }
@@ -207,9 +237,10 @@
     overflow-y: auto;
     background: var(--panel);
     border-top: 1px solid var(--panel-border);
-    border-radius: 16px 16px 0 0;
-    padding: 16px 18px max(20px, env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    padding: 18px 18px max(20px, env(safe-area-inset-bottom));
     z-index: 21;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
     transform: translateY(100%);
     transition: transform 0.2s ease-out;
   }
@@ -284,15 +315,6 @@
   .indicator-label { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
   .indicator-value { font-size: 15px; font-weight: 700; }
 
-  #manage-toggle-btn {
-    background: var(--panel);
-    color: var(--accent);
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-weight: 600;
-  }
   #manage-overlay {
     position: fixed;
     inset: 0;
@@ -310,9 +332,10 @@
     overflow-y: auto;
     background: var(--panel);
     border-top: 1px solid var(--panel-border);
-    border-radius: 16px 16px 0 0;
-    padding: 16px 18px max(20px, env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    padding: 18px 18px max(20px, env(safe-area-inset-bottom));
     z-index: 21;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
     transform: translateY(100%);
     transition: transform 0.2s ease-out;
   }
@@ -358,6 +381,86 @@
     font-size: 13px;
     text-align: right;
   }
+  .manage-edit-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .manage-holding-summary {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  #holding-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 20;
+    display: none;
+  }
+  #holding-overlay.open { display: block; }
+  #holding-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-border);
+    border-radius: 20px 20px 0 0;
+    padding: 18px 18px max(20px, env(safe-area-inset-bottom));
+    z-index: 21;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
+    transform: translateY(100%);
+    transition: transform 0.2s ease-out;
+  }
+  #holding-overlay.open #holding-sheet { transform: translateY(0); }
+  #holding-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .holding-field {
+    margin-bottom: 14px;
+  }
+  .holding-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .holding-field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 15px;
+  }
+  .holding-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .holding-btn-primary, .holding-btn-secondary {
+    flex: 1;
+    border-radius: 10px;
+    padding: 11px 0;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+  }
+  .holding-btn-primary { background: var(--accent); color: #06283a; }
+  .holding-btn-secondary { background: none; border: 1px solid var(--down); color: var(--down); }
   .manage-ticker { font-weight: 700; font-size: 14px; }
   .manage-name {
     font-size: 12px;
@@ -442,6 +545,30 @@
       <button id="manage-close">✕</button>
     </div>
     <div id="manage-list"></div>
+  </div>
+</div>
+
+<div id="holding-overlay">
+  <div id="holding-sheet">
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">保有株を編集</div>
+        <div class="detail-name" id="holding-edit-ticker"></div>
+      </div>
+      <button id="holding-close">✕</button>
+    </div>
+    <div class="holding-field">
+      <label for="holding-shares-input">株数</label>
+      <input type="number" id="holding-shares-input" min="0" step="1" inputmode="numeric" placeholder="例: 100">
+    </div>
+    <div class="holding-field">
+      <label for="holding-buyprice-input">購入価格(1株あたり・任意)</label>
+      <input type="number" id="holding-buyprice-input" min="0" step="0.01" inputmode="decimal" placeholder="例: 520">
+    </div>
+    <div class="holding-actions">
+      <button id="holding-clear-btn" class="holding-btn-secondary">保有をクリア</button>
+      <button id="holding-save-btn" class="holding-btn-primary">保存</button>
+    </div>
   </div>
 </div>
 
@@ -758,6 +885,7 @@ function openDetail(ticker) {
 function closeOverlays(fromPopstate) {
   const detailOverlay = document.getElementById("detail-overlay");
   const manageOverlay = document.getElementById("manage-overlay");
+  const holdingOverlay = document.getElementById("holding-overlay");
   let closedSomething = false;
   if (detailOverlay.classList.contains("open")) {
     detailOverlay.classList.remove("open");
@@ -766,6 +894,10 @@ function closeOverlays(fromPopstate) {
   }
   if (manageOverlay.classList.contains("open")) {
     manageOverlay.classList.remove("open");
+    closedSomething = true;
+  }
+  if (holdingOverlay.classList.contains("open")) {
+    holdingOverlay.classList.remove("open");
     closedSomething = true;
   }
   if (closedSomething && !fromPopstate) history.back();
@@ -789,26 +921,19 @@ function renderManageList() {
   }
   manageListEl.innerHTML = tickers.map((t) => {
     const holding = getHolding(t.ticker);
+    const summary = holding.shares > 0
+      ? `保有 ${holding.shares.toLocaleString()}株${holding.buyPrice ? ` ・ 購入 ${formatPrice(holding.buyPrice)}` : ""}`
+      : "保有なし";
     return `
     <div class="manage-row" data-row-ticker="${t.ticker}">
       <div class="manage-row-top">
         <div class="manage-row-main">
           <div class="manage-ticker">${t.ticker}</div>
           <div class="manage-name">${t.name}</div>
+          <div class="manage-holding-summary">${summary}</div>
         </div>
+        <button class="manage-edit-btn" data-ticker="${t.ticker}">保有を編集</button>
         <button class="manage-delete-btn" data-ticker="${t.ticker}">削除</button>
-      </div>
-      <div class="manage-holding-fields">
-        <label class="manage-holding-field">株数
-          <input type="number" class="manage-shares-input" data-ticker="${t.ticker}"
-                 min="0" step="1" inputmode="numeric" placeholder="0"
-                 value="${holding.shares || ""}">
-        </label>
-        <label class="manage-holding-field">購入価格
-          <input type="number" class="manage-buyprice-input" data-ticker="${t.ticker}"
-                 min="0" step="0.01" inputmode="decimal" placeholder="任意"
-                 value="${holding.buyPrice || ""}">
-        </label>
       </div>
     </div>`;
   }).join("");
@@ -844,15 +969,47 @@ manageListEl.addEventListener("click", (e) => {
   renderManageList();
 });
 
-manageListEl.addEventListener("change", (e) => {
-  const input = e.target.closest(".manage-shares-input, .manage-buyprice-input");
-  if (!input) return;
-  const ticker = input.dataset.ticker;
-  const row = input.closest(".manage-row");
-  const sharesVal = row.querySelector(".manage-shares-input").value;
-  const buyPriceVal = row.querySelector(".manage-buyprice-input").value;
-  setHolding(ticker, sharesVal, buyPriceVal);
+let holdingEditTicker = null;
+const holdingOverlayEl = document.getElementById("holding-overlay");
+const holdingSharesInput = document.getElementById("holding-shares-input");
+const holdingBuyPriceInput = document.getElementById("holding-buyprice-input");
+
+function openHoldingEdit(ticker) {
+  holdingEditTicker = ticker;
+  const holding = getHolding(ticker);
+  document.getElementById("holding-edit-ticker").textContent = ticker;
+  holdingSharesInput.value = holding.shares || "";
+  holdingBuyPriceInput.value = holding.buyPrice || "";
+  history.pushState({ holdingEdit: true }, "");
+  holdingOverlayEl.classList.add("open");
+}
+
+manageListEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".manage-edit-btn");
+  if (!btn) return;
+  openHoldingEdit(btn.dataset.ticker);
+});
+
+document.getElementById("holding-close").addEventListener("click", () => closeOverlays(false));
+holdingOverlayEl.addEventListener("click", (e) => {
+  if (e.target.id === "holding-overlay") closeOverlays(false);
+});
+
+document.getElementById("holding-save-btn").addEventListener("click", () => {
+  if (!holdingEditTicker) return;
+  setHolding(holdingEditTicker, holdingSharesInput.value, holdingBuyPriceInput.value);
   if (latestPayload) render();
+  renderManageList();
+  closeOverlays(false);
+});
+
+document.getElementById("holding-clear-btn").addEventListener("click", () => {
+  if (!holdingEditTicker) return;
+  if (!confirm("保有情報をクリアしますか?")) return;
+  setHolding(holdingEditTicker, 0, null);
+  if (latestPayload) render();
+  renderManageList();
+  closeOverlays(false);
 });
 
 async function runRefresh(silent) {
