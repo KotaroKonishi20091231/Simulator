@@ -736,7 +736,7 @@ manageListEl.addEventListener("click", (e) => {
   renderManageList();
 });
 
-refreshBtn.addEventListener("click", async () => {
+async function runRefresh(silent) {
   refreshBtn.disabled = true;
   refreshBtn.textContent = "更新中...";
   statusEl.style.display = latestPayload ? "none" : "block";
@@ -746,13 +746,15 @@ refreshBtn.addEventListener("click", async () => {
     });
     showPayload(payload);
   } catch (e) {
-    alert("更新に失敗しました:\n" + (e.stack || e.message));
+    if (!silent) alert("更新に失敗しました:\n" + (e.stack || e.message));
     if (latestPayload) showPayload(latestPayload);
   } finally {
     refreshBtn.disabled = false;
     refreshBtn.textContent = "更新";
   }
-});
+}
+
+refreshBtn.addEventListener("click", () => runRefresh(false));
 
 const addToggleBtn = document.getElementById("add-toggle-btn");
 const addFormEl = document.getElementById("add-form");
@@ -795,6 +797,7 @@ addFormEl.addEventListener("submit", async (e) => {
 });
 
 initFromCache();
+runRefresh(true);
 </script>
 </body>
 </html>
