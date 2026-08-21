@@ -505,6 +505,34 @@
     line-height: 1;
     padding: 4px 8px;
   }
+  .settings-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-top: 1px solid var(--panel-border);
+    margin: 16px 0 12px;
+    padding-top: 14px;
+  }
+  .holding-field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .settings-check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text);
+    padding: 9px 0;
+  }
+  .settings-check-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .manage-ticker { font-weight: 700; font-size: 14px; }
   .manage-name {
     font-size: 12px;
@@ -628,6 +656,34 @@
       <label for="settings-maxprice-input">上限金額(1株あたり ¥)</label>
       <input type="number" id="settings-maxprice-input" min="1" step="1" inputmode="numeric" placeholder="例: 1500">
     </div>
+
+    <div class="settings-section-title">表示</div>
+    <div class="holding-field">
+      <label for="settings-sortorder-select">表示順</label>
+      <select id="settings-sortorder-select">
+        <option value="added">追加した順(新しい発見が上)</option>
+        <option value="score">スコアが高い順</option>
+      </select>
+    </div>
+    <label class="settings-check-row">
+      <input type="checkbox" id="settings-autorefresh-check">
+      アプリを開いた時に自動で更新する
+    </label>
+    <label class="settings-check-row">
+      <input type="checkbox" id="settings-reversalbadge-check">
+      反発シグナルのバッジを表示する
+    </label>
+
+    <div class="settings-section-title">反発シグナルの感度</div>
+    <div class="holding-field">
+      <label for="settings-drawdown-input">下落率のしきい値(%以上)</label>
+      <input type="number" id="settings-drawdown-input" min="1" max="90" step="1" inputmode="numeric" placeholder="例: 15">
+    </div>
+    <div class="holding-field">
+      <label for="settings-recovery-input">回復率のしきい値(%以上)</label>
+      <input type="number" id="settings-recovery-input" min="1" max="90" step="1" inputmode="numeric" placeholder="例: 5">
+    </div>
+
     <div class="holding-actions">
       <button id="settings-save-btn" class="holding-btn-primary">保存</button>
     </div>
@@ -694,9 +750,8 @@ function formatPrice(price) {
 }
 
 // A rough "V-shaped reversal" detector: a meaningful drop from a recent peak,
-// followed by a few days of recovery that hasn't gone stale.
-const REVERSAL_MIN_DRAWDOWN = 0.15;
-const REVERSAL_MIN_RECOVERY = 0.05;
+// followed by a few days of recovery that hasn't gone stale. Sensitivity
+// (drawdown/recovery thresholds) is user-configurable in 設定.
 const REVERSAL_MIN_DAYS_SINCE_TROUGH = 2;
 const REVERSAL_MAX_DAYS_SINCE_TROUGH = 40;
 
@@ -722,7 +777,8 @@ function detectReversal(recentCloses) {
   const current = closes[closes.length - 1];
   const recovery = (current - trough) / trough;
 
-  return drawdown >= REVERSAL_MIN_DRAWDOWN && recovery >= REVERSAL_MIN_RECOVERY;
+  const settings = loadSettings();
+  return drawdown >= settings.reversalMinDrawdownPct / 100 && recovery >= settings.reversalMinRecoveryPct / 100;
 }
 
 function renderHoldingRow(pick) {
@@ -743,7 +799,7 @@ function renderCard(pick) {
     ? `${(pick.ml_probability * 100).toFixed(1)}%`
     : `${pick.heuristic_score.toFixed(0)}/100`;
   const scoreLabel = pick.ml_probability !== null && pick.ml_probability !== undefined ? "上昇確率" : "スコア";
-  const reversalBadge = detectReversal(pick.recent_closes)
+  const reversalBadge = loadSettings().showReversalBadge && detectReversal(pick.recent_closes)
     ? `<div class="reversal-badge">📈 反発シグナル(急落からの回復)</div>` : "";
   const holdingRow = renderHoldingRow(pick);
   return `
@@ -772,10 +828,19 @@ function render() {
   // The watchlist itself never drops a ticker just because its price moved,
   // but anything above the current cap is hidden from view until it's back
   // under the cap (or the cap is raised again in 設定).
-  const picks = allPicks.filter((p) => p.price <= maxPrice);
+  let picks = allPicks.filter((p) => p.price <= maxPrice);
   if (picks.length === 0) {
     listEl.innerHTML = `<div id="status">条件(¥${maxPrice.toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
     return;
+  }
+  // "added" keeps the watchlist's own order (newest find first); "score"
+  // re-sorts a copy for display without touching the underlying order.
+  if (loadSettings().sortOrder === "score") {
+    picks = [...picks].sort((a, b) => {
+      const sa = a.ml_probability ?? a.heuristic_score;
+      const sb = b.ml_probability ?? b.heuristic_score;
+      return sb - sa;
+    });
   }
   let html = picks.map((p) => renderCard(p)).join("");
   listEl.innerHTML = html;
@@ -1090,9 +1155,20 @@ function updateSubtitleText() {
 
 const settingsOverlayEl = document.getElementById("settings-overlay");
 const settingsMaxPriceInput = document.getElementById("settings-maxprice-input");
+const settingsSortOrderSelect = document.getElementById("settings-sortorder-select");
+const settingsAutoRefreshCheck = document.getElementById("settings-autorefresh-check");
+const settingsReversalBadgeCheck = document.getElementById("settings-reversalbadge-check");
+const settingsDrawdownInput = document.getElementById("settings-drawdown-input");
+const settingsRecoveryInput = document.getElementById("settings-recovery-input");
 
 document.getElementById("settings-toggle-btn").addEventListener("click", () => {
   settingsMaxPriceInput.value = loadMaxPrice();
+  const s = loadSettings();
+  settingsSortOrderSelect.value = s.sortOrder;
+  settingsAutoRefreshCheck.checked = s.autoRefresh;
+  settingsReversalBadgeCheck.checked = s.showReversalBadge;
+  settingsDrawdownInput.value = s.reversalMinDrawdownPct;
+  settingsRecoveryInput.value = s.reversalMinRecoveryPct;
   history.pushState({ settings: true }, "");
   settingsOverlayEl.classList.add("open");
 });
@@ -1101,13 +1177,27 @@ settingsOverlayEl.addEventListener("click", (e) => {
   if (e.target.id === "settings-overlay") closeOverlays(false);
 });
 document.getElementById("settings-save-btn").addEventListener("click", () => {
-  const value = Number(settingsMaxPriceInput.value);
-  if (!Number.isFinite(value) || value <= 0) {
-    alert("正しい金額を入力してください。");
+  const maxPrice = Number(settingsMaxPriceInput.value);
+  const drawdown = Number(settingsDrawdownInput.value);
+  const recovery = Number(settingsRecoveryInput.value);
+  if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+    alert("正しい上限金額を入力してください。");
     return;
   }
-  saveMaxPrice(value);
+  if (!Number.isFinite(drawdown) || drawdown <= 0 || !Number.isFinite(recovery) || recovery <= 0) {
+    alert("反発シグナルの感度は正しい数値を入力してください。");
+    return;
+  }
+  saveMaxPrice(maxPrice);
+  saveSettings({
+    sortOrder: settingsSortOrderSelect.value,
+    autoRefresh: settingsAutoRefreshCheck.checked,
+    showReversalBadge: settingsReversalBadgeCheck.checked,
+    reversalMinDrawdownPct: drawdown,
+    reversalMinRecoveryPct: recovery,
+  });
   updateSubtitleText();
+  if (latestPayload) render();
   closeOverlays(false);
 });
 
@@ -1174,7 +1264,7 @@ addFormEl.addEventListener("submit", async (e) => {
 });
 
 initFromCache();
-runRefresh(true);
+if (loadSettings().autoRefresh) runRefresh(true);
 </script>
 </body>
 </html>

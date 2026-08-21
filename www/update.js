@@ -30,6 +30,30 @@ function saveMaxPrice(value) {
   try { localStorage.setItem(MAX_PRICE_STORAGE_KEY, String(n)); } catch (e) { /* ignore */ }
 }
 
+const SETTINGS_STORAGE_KEY = "surge_predictor_settings";
+const DEFAULT_SETTINGS = {
+  autoRefresh: true,
+  sortOrder: "added", // "added" (newest find first) | "score" (highest score first)
+  showReversalBadge: true,
+  reversalMinDrawdownPct: 15,
+  reversalMinRecoveryPct: 5,
+};
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_SETTINGS };
+  } catch (e) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(partial) {
+  const merged = { ...loadSettings(), ...partial };
+  try { localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged)); } catch (e) { /* ignore */ }
+  return merged;
+}
+
 const DISCLAIMER = "本ツールは統計的・技術的分析に基づく実験的な予測であり、投資助言ではありません。" +
   "予測は外れる可能性があり、将来の成果を保証するものではありません。" +
   "実際の売買判断とその結果については、すべて利用者ご自身の責任で行ってください。";
