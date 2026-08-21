@@ -161,19 +161,6 @@
     transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   }
   .card:active { background: #1c2a4a; transform: scale(0.985); box-shadow: none; }
-  .rank {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-dim);
-    width: 26px;
-    height: 26px;
-    line-height: 26px;
-    text-align: center;
-    flex-shrink: 0;
-    background: var(--bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 50%;
-  }
   .card-main { flex: 1; min-width: 0; }
   .card-title {
     display: flex;
@@ -761,7 +748,6 @@ function renderCard(pick) {
   const holdingRow = renderHoldingRow(pick);
   return `
     <div class="card" data-ticker="${pick.ticker}">
-      <div class="rank">${pick.rank}</div>
       ${renderSparkline(pick.recent_closes)}
       <div class="card-main">
         <div class="card-title">
