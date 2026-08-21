@@ -125,7 +125,6 @@ function loadPredictions() {
 }
 
 function buildDataset(tickerEntries, histories) {
-  const maxPrice = loadMaxPrice();
   const allLabeled = [];
   const liveCandidates = [];
 
@@ -156,8 +155,13 @@ function buildDataset(tickerEntries, histories) {
       allLabeled.push({ date: dates[i], row: buildFeatureRow(vec, entry.market), label });
     }
 
+    // Every successfully-fetched ticker becomes a live candidate here, regardless
+    // of price — the price cap is applied later (which stocks get newly added to
+    // the watchlist, and which are hidden from the main list), not by dropping
+    // their data entirely. That way 銘柄管理 can always show a ticker's real
+    // current price, even for ones currently priced above the cap.
     const liveVec = featureVectorAt(features, lastIdx);
-    if (liveVec && closes[lastIdx] && closes[lastIdx] <= maxPrice) {
+    if (liveVec && closes[lastIdx]) {
       const recentStart = Math.max(0, lastIdx - RECENT_CHART_POINTS + 1);
       liveCandidates.push({
         ticker: entry.ticker,
@@ -277,7 +281,8 @@ async function runUpdate(onProgress) {
     .filter((p) => trackedTickers.has(p.ticker))
     .map((old) => freshByTicker.get(old.ticker) || old);
   const alreadyKnown = new Set(carriedOver.map((p) => p.ticker));
-  const newlyDiscovered = freshPicks.filter((p) => !alreadyKnown.has(p.ticker));
+  const maxPrice = loadMaxPrice();
+  const newlyDiscovered = freshPicks.filter((p) => !alreadyKnown.has(p.ticker) && p.price <= maxPrice);
 
   const watchlist = [...newlyDiscovered, ...carriedOver];
   watchlist.forEach((p, i) => { p.rank = i + 1; });
