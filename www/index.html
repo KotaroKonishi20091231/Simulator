@@ -781,9 +781,14 @@ function renderCard(pick) {
 
 function render() {
   if (!latestPayload) return;
-  const picks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
+  const maxPrice = loadMaxPrice();
+  const allPicks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
+  // The watchlist itself never drops a ticker just because its price moved,
+  // but anything above the current cap is hidden from view until it's back
+  // under the cap (or the cap is raised again in 設定).
+  const picks = allPicks.filter((p) => p.price <= maxPrice);
   if (picks.length === 0) {
-    listEl.innerHTML = `<div id="status">条件(¥${loadMaxPrice().toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
+    listEl.innerHTML = `<div id="status">条件(¥${maxPrice.toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
     return;
   }
   let html = picks.map((p) => renderCard(p)).join("");
