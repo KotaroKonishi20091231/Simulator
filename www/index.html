@@ -47,13 +47,41 @@
     align-items: center;
     font-size: 12px;
     color: var(--text-dim);
+    gap: 8px;
+  }
+  #updated-at {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .subtitle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
   }
   .subtitle {
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.2px;
     color: var(--text);
-    margin-bottom: 10px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #settings-toggle-btn {
+    flex-shrink: 0;
+    background: var(--panel);
+    color: var(--text-dim);
+    border: 1px solid var(--panel-border);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 15px;
+    line-height: 1;
   }
   button { transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease; }
   button:active { transform: scale(0.96); }
@@ -68,7 +96,7 @@
     box-shadow: var(--shadow-sm);
   }
   button#refresh-btn:disabled { opacity: 0.5; box-shadow: none; }
-  .header-actions { display: flex; gap: 8px; }
+  .header-actions { display: flex; gap: 8px; flex-shrink: 0; }
   button#add-toggle-btn, button#manage-toggle-btn {
     background: var(--panel);
     color: var(--accent);
@@ -78,11 +106,13 @@
     font-size: 13px;
     font-weight: 600;
   }
-  button#manage-toggle-btn {
-    line-height: 1.25;
-    padding: 5px 14px;
+  button#manage-toggle-btn, button#add-toggle-btn {
+    flex-shrink: 0;
+    line-height: 1.3;
+    padding: 5px 12px;
     text-align: center;
   }
+  .btn-line { white-space: nowrap; }
   #add-form {
     display: none;
     gap: 8px;
@@ -456,6 +486,38 @@
   }
   .holding-btn-primary { background: var(--accent); color: #06283a; }
   .holding-btn-secondary { background: none; border: 1px solid var(--down); color: var(--down); }
+
+  #settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 20;
+    display: none;
+  }
+  #settings-overlay.open { display: block; }
+  #settings-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--panel-border);
+    border-radius: 20px 20px 0 0;
+    padding: 18px 18px max(20px, env(safe-area-inset-bottom));
+    z-index: 21;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
+    transform: translateY(100%);
+    transition: transform 0.2s ease-out;
+  }
+  #settings-overlay.open #settings-sheet { transform: translateY(0); }
+  #settings-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 8px;
+  }
   .manage-ticker { font-weight: 700; font-size: 14px; }
   .manage-name {
     font-size: 12px;
@@ -478,12 +540,15 @@
 </head>
 <body>
 <header>
-  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作</div>
+  <div class="subtitle-row">
+    <div class="subtitle" id="subtitle-text">🇯🇵 日本株(1株 ¥1,500以下)</div>
+    <button id="settings-toggle-btn" aria-label="設定">⚙</button>
+  </div>
   <div class="meta-row">
     <span id="updated-at">読み込み中...</span>
     <div class="header-actions">
-      <button id="manage-toggle-btn">銘柄<br>管理</button>
-      <button id="add-toggle-btn">＋銘柄追加</button>
+      <button id="manage-toggle-btn"><span class="btn-line">銘柄</span><br><span class="btn-line">管理</span></button>
+      <button id="add-toggle-btn"><span class="btn-line">＋銘柄</span><br><span class="btn-line">追加</span></button>
       <button id="refresh-btn">更新</button>
     </div>
   </div>
@@ -562,6 +627,22 @@
     <div class="holding-actions">
       <button id="holding-clear-btn" class="holding-btn-secondary">保有をクリア</button>
       <button id="holding-save-btn" class="holding-btn-primary">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-overlay">
+  <div id="settings-sheet">
+    <div class="detail-header">
+      <div class="detail-title">設定</div>
+      <button id="settings-close">✕</button>
+    </div>
+    <div class="holding-field">
+      <label for="settings-maxprice-input">上限金額(1株あたり ¥)</label>
+      <input type="number" id="settings-maxprice-input" min="1" step="1" inputmode="numeric" placeholder="例: 1500">
+    </div>
+    <div class="holding-actions">
+      <button id="settings-save-btn" class="holding-btn-primary">保存</button>
     </div>
   </div>
 </div>
@@ -702,7 +783,7 @@ function render() {
   if (!latestPayload) return;
   const picks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
   if (picks.length === 0) {
-    listEl.innerHTML = `<div id="status">条件(¥1,500以下)に合う銘柄が見つかりませんでした</div>`;
+    listEl.innerHTML = `<div id="status">条件(¥${loadMaxPrice().toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
     return;
   }
   let html = picks.map((p) => renderCard(p)).join("");
@@ -894,6 +975,11 @@ function closeOverlays(fromPopstate) {
     holdingOverlay.classList.remove("open");
     closedSomething = true;
   }
+  const settingsOverlay = document.getElementById("settings-overlay");
+  if (settingsOverlay.classList.contains("open")) {
+    settingsOverlay.classList.remove("open");
+    closedSomething = true;
+  }
   if (closedSomething && !fromPopstate) history.back();
 }
 
@@ -1005,6 +1091,36 @@ document.getElementById("holding-clear-btn").addEventListener("click", () => {
   renderManageList();
   closeOverlays(false);
 });
+
+function updateSubtitleText() {
+  document.getElementById("subtitle-text").textContent =
+    `🇯🇵 日本株(1株 ¥${loadMaxPrice().toLocaleString()}以下)`;
+}
+
+const settingsOverlayEl = document.getElementById("settings-overlay");
+const settingsMaxPriceInput = document.getElementById("settings-maxprice-input");
+
+document.getElementById("settings-toggle-btn").addEventListener("click", () => {
+  settingsMaxPriceInput.value = loadMaxPrice();
+  history.pushState({ settings: true }, "");
+  settingsOverlayEl.classList.add("open");
+});
+document.getElementById("settings-close").addEventListener("click", () => closeOverlays(false));
+settingsOverlayEl.addEventListener("click", (e) => {
+  if (e.target.id === "settings-overlay") closeOverlays(false);
+});
+document.getElementById("settings-save-btn").addEventListener("click", () => {
+  const value = Number(settingsMaxPriceInput.value);
+  if (!Number.isFinite(value) || value <= 0) {
+    alert("正しい金額を入力してください。");
+    return;
+  }
+  saveMaxPrice(value);
+  updateSubtitleText();
+  closeOverlays(false);
+});
+
+updateSubtitleText();
 
 async function runRefresh(silent) {
   refreshBtn.disabled = true;

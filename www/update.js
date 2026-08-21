@@ -1,7 +1,7 @@
 // Ported from update.py — orchestrates fetch -> indicators -> train/predict -> rank,
 // entirely on-device (no server). Tickers and results persist in localStorage.
 
-const JP_MAX_PRICE = 1500;
+const DEFAULT_MAX_PRICE = 1500;
 const HOLDOUT_DAYS = 40;
 const MIN_TRAINING_ROWS = 200;
 const RECENT_CHART_POINTS = 90;
@@ -11,7 +11,24 @@ const SURGE_THRESHOLD = 0.08;
 const TICKERS_STORAGE_KEY = "surge_predictor_tickers";
 const PREDICTIONS_STORAGE_KEY = "surge_predictor_predictions";
 const HOLDINGS_STORAGE_KEY = "surge_predictor_holdings";
+const MAX_PRICE_STORAGE_KEY = "surge_predictor_max_price";
 const JP_TICKER_RE = /^[0-9A-Za-z]{3,5}\.T$/;
+
+function loadMaxPrice() {
+  try {
+    const raw = localStorage.getItem(MAX_PRICE_STORAGE_KEY);
+    const n = Number(raw);
+    return raw !== null && Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_PRICE;
+  } catch (e) {
+    return DEFAULT_MAX_PRICE;
+  }
+}
+
+function saveMaxPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return;
+  try { localStorage.setItem(MAX_PRICE_STORAGE_KEY, String(n)); } catch (e) { /* ignore */ }
+}
 
 const DISCLAIMER = "本ツールは統計的・技術的分析に基づく実験的な予測であり、投資助言ではありません。" +
   "予測は外れる可能性があり、将来の成果を保証するものではありません。" +
@@ -84,6 +101,7 @@ function loadPredictions() {
 }
 
 function buildDataset(tickerEntries, histories) {
+  const maxPrice = loadMaxPrice();
   const allLabeled = [];
   const liveCandidates = [];
 
@@ -115,7 +133,7 @@ function buildDataset(tickerEntries, histories) {
     }
 
     const liveVec = featureVectorAt(features, lastIdx);
-    if (liveVec && closes[lastIdx] && closes[lastIdx] <= JP_MAX_PRICE) {
+    if (liveVec && closes[lastIdx] && closes[lastIdx] <= maxPrice) {
       const recentStart = Math.max(0, lastIdx - RECENT_CHART_POINTS + 1);
       liveCandidates.push({
         ticker: entry.ticker,
