@@ -534,6 +534,7 @@
   }
   .settings-check-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .manage-ticker { font-weight: 700; font-size: 14px; }
+  .manage-price { font-weight: 600; font-size: 13px; color: var(--accent); margin-left: 6px; }
   .manage-name {
     font-size: 12px;
     color: var(--text-dim);
@@ -1060,11 +1061,13 @@ function renderManageList() {
     const summary = holding.shares > 0
       ? `保有 ${holding.shares.toLocaleString()}株${holding.buyPrice ? ` ・ 購入 ${formatPrice(holding.buyPrice)}` : ""}`
       : "保有なし";
+    const currentPick = findPick(t.ticker);
+    const priceLabel = currentPick ? formatPrice(currentPick.price) : "価格未取得";
     return `
     <div class="manage-row" data-row-ticker="${t.ticker}">
       <div class="manage-row-top">
         <div class="manage-row-main">
-          <div class="manage-ticker">${t.ticker}</div>
+          <div class="manage-ticker">${t.ticker} <span class="manage-price">${priceLabel}</span></div>
           <div class="manage-name">${t.name}</div>
           <div class="manage-holding-summary">${summary}</div>
         </div>
