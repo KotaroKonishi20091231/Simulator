@@ -41,18 +41,6 @@
     border-bottom: 1px solid var(--panel-border);
     box-shadow: var(--shadow-sm);
   }
-  h1 {
-    font-size: 19px;
-    letter-spacing: 0.2px;
-    margin: 0 0 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(90deg, var(--text), var(--accent-2) 140%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
   .meta-row {
     display: flex;
     justify-content: space-between;
@@ -61,9 +49,11 @@
     color: var(--text-dim);
   }
   .subtitle {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-top: 2px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--text);
+    margin-bottom: 10px;
   }
   button { transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease; }
   button:active { transform: scale(0.96); }
@@ -87,6 +77,11 @@
     padding: 7px 14px;
     font-size: 13px;
     font-weight: 600;
+  }
+  button#manage-toggle-btn {
+    line-height: 1.25;
+    padding: 5px 14px;
+    text-align: center;
   }
   #add-form {
     display: none;
@@ -483,16 +478,15 @@
 </head>
 <body>
 <header>
-  <h1>📈 Surge Predictor</h1>
+  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作</div>
   <div class="meta-row">
     <span id="updated-at">読み込み中...</span>
     <div class="header-actions">
-      <button id="manage-toggle-btn">銘柄管理</button>
+      <button id="manage-toggle-btn">銘柄<br>管理</button>
       <button id="add-toggle-btn">＋銘柄追加</button>
       <button id="refresh-btn">更新</button>
     </div>
   </div>
-  <div class="subtitle">🇯🇵 日本株(1株 ¥1,500以下)・スマホ単体で動作 </div>
   <form id="add-form">
     <input id="add-ticker-input" type="text" placeholder="銘柄コード 例: 7203" autocomplete="off" inputmode="numeric">
     <button id="add-submit-btn" type="submit">追加</button>
