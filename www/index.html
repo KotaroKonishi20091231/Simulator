@@ -1107,8 +1107,34 @@ const manageToggleBtn = document.getElementById("manage-toggle-btn");
 const manageOverlayEl = document.getElementById("manage-overlay");
 const manageListEl = document.getElementById("manage-list");
 
-function renderManageList() {
+function sortedTickersForManage() {
   const tickers = loadTickers();
+  const maxPrice = loadMaxPrice();
+  const displayedTickers = ((latestPayload && latestPayload.markets && latestPayload.markets[MARKET]) || [])
+    .filter((p) => p.price <= maxPrice)
+    .map((p) => p.ticker);
+  const displayedOrder = new Map(displayedTickers.map((ticker, i) => [ticker, i]));
+
+  const displayed = [];
+  const rest = [];
+  for (const t of tickers) {
+    if (displayedOrder.has(t.ticker)) displayed.push(t);
+    else rest.push(t);
+  }
+  displayed.sort((a, b) => displayedOrder.get(a.ticker) - displayedOrder.get(b.ticker));
+  rest.sort((a, b) => {
+    const pa = findPick(a.ticker)?.price;
+    const pb = findPick(b.ticker)?.price;
+    if (pa == null && pb == null) return 0;
+    if (pa == null) return 1;
+    if (pb == null) return -1;
+    return pa - pb;
+  });
+  return [...displayed, ...rest];
+}
+
+function renderManageList() {
+  const tickers = sortedTickersForManage();
   if (!tickers.length) {
     manageListEl.innerHTML = `<div style="color:var(--text-dim);font-size:13px;padding:12px 0;">追跡中の銘柄がありません。</div>`;
     return;
