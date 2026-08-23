@@ -147,6 +147,26 @@
   #add-status.error { color: var(--down); }
   #add-status.ok { color: var(--up); }
   main { padding: 12px 16px; }
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .filter-btn {
+    flex: 1;
+    background: var(--panel);
+    color: var(--text-dim);
+    border: 1px solid var(--panel-border);
+    border-radius: 999px;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .filter-btn.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #06283a;
+    border-color: transparent;
+  }
   .card {
     background: linear-gradient(160deg, var(--panel), #141d34);
     border: 1px solid var(--panel-border);
@@ -575,6 +595,10 @@
   <div id="add-status"></div>
 </header>
 <main>
+  <div class="filter-bar">
+    <button id="filter-all-btn" class="filter-btn active">すべて</button>
+    <button id="filter-holdings-btn" class="filter-btn">保有中のみ</button>
+  </div>
   <div id="status">読み込み中...</div>
   <div id="list" style="display:none"></div>
   <div id="disclaimer"></div>
@@ -822,6 +846,8 @@ function renderCard(pick) {
     </div>`;
 }
 
+let showHoldingsOnly = false;
+
 function render() {
   if (!latestPayload) return;
   const maxPrice = loadMaxPrice();
@@ -830,8 +856,13 @@ function render() {
   // but anything above the current cap is hidden from view until it's back
   // under the cap (or the cap is raised again in 設定).
   let picks = allPicks.filter((p) => p.price <= maxPrice);
+  if (showHoldingsOnly) {
+    picks = picks.filter((p) => getHolding(p.ticker).shares > 0);
+  }
   if (picks.length === 0) {
-    listEl.innerHTML = `<div id="status">条件(¥${maxPrice.toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
+    listEl.innerHTML = showHoldingsOnly
+      ? `<div id="status">保有中の銘柄がありません。「銘柄管理」から保有株を登録できます。</div>`
+      : `<div id="status">条件(¥${maxPrice.toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
     return;
   }
   // "added" keeps the watchlist's own order (newest find first); "score"
@@ -1202,6 +1233,22 @@ document.getElementById("settings-save-btn").addEventListener("click", () => {
   updateSubtitleText();
   if (latestPayload) render();
   closeOverlays(false);
+});
+
+const filterAllBtn = document.getElementById("filter-all-btn");
+const filterHoldingsBtn = document.getElementById("filter-holdings-btn");
+
+filterAllBtn.addEventListener("click", () => {
+  showHoldingsOnly = false;
+  filterAllBtn.classList.add("active");
+  filterHoldingsBtn.classList.remove("active");
+  if (latestPayload) render();
+});
+filterHoldingsBtn.addEventListener("click", () => {
+  showHoldingsOnly = true;
+  filterHoldingsBtn.classList.add("active");
+  filterAllBtn.classList.remove("active");
+  if (latestPayload) render();
 });
 
 updateSubtitleText();
