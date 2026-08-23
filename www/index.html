@@ -692,7 +692,7 @@
     <div class="detail-news-title">AIの見解</div>
     <div class="ai-opinion-box">
       <div id="detail-ai-opinion"></div>
-      <div class="ai-opinion-note">※価格・出来高データを基にした自動生成のコメントです(ニュース内容は反映していません)</div>
+      <div class="ai-opinion-note">※価格・出来高データからの自動推測です。実際のニュース内容は読んでいないため確度は低く、参考程度にご覧ください</div>
     </div>
     <button id="detail-holding-btn" class="card-holding-btn" style="margin-top:14px;">保有を編集</button>
   </div>
@@ -795,9 +795,31 @@ let latestPayload = null;
 // A rule-based "AI opinion" paragraph, built from the same price/volume
 // indicators used elsewhere in the app — not a real generative AI (no paid
 // API), but phrased as a short flowing comment instead of a jargon table.
+// A speculative guess at *why* the stock has been moving, inferred only from
+// how big the move was and whether volume spiked alongside it. This is NOT
+// based on reading any actual news — real reasons need the headlines above.
+function buildReasonSpeculation(pick) {
+  const ind = pick.indicators;
+  const movingUp = ind.roc20 >= 0;
+  const bigMove = Math.abs(ind.roc20) > 5;
+  const volSpike = ind.volume_ratio20 > 1.5;
+
+  if (bigMove && volSpike) {
+    return movingUp
+      ? "出来高を伴って大きく上昇しており、決算発表や好材料のニュースが出た可能性があります(推測)"
+      : "出来高を伴って大きく下落しており、悪材料のニュースが出た可能性があります(推測)";
+  }
+  if (bigMove && !volSpike) {
+    return movingUp
+      ? "出来高の急増は見られず、個別ニュースというより市場全体の地合いに沿った上昇の可能性があります(推測)"
+      : "出来高の急増は見られず、個別ニュースというより利益確定売りや市場全体の地合いの可能性があります(推測)";
+  }
+  return "直近で大きな価格変動は見られず、これといった材料は出ていない可能性があります(推測)";
+}
+
 function buildAiOpinion(pick) {
   const ind = pick.indicators;
-  const parts = [];
+  const parts = [buildReasonSpeculation(pick)];
 
   if (ind.macd_hist > 0 && ind.roc20 > 3) parts.push("直近では上昇の勢いが強く出ています");
   else if (ind.macd_hist > 0) parts.push("直近では緩やかな上昇トレンドにあります");
