@@ -100,6 +100,27 @@ async function fetchCompanyName(ticker) {
   }
 }
 
+async function fetchNewsHeadlines(query, limit = 5) {
+  try {
+    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const text = await res.text();
+    const doc = new DOMParser().parseFromString(text, "text/xml");
+    if (doc.querySelector("parsererror")) return [];
+    return Array.from(doc.querySelectorAll("item"))
+      .slice(0, limit)
+      .map((item) => ({
+        title: item.querySelector("title")?.textContent || "",
+        link: item.querySelector("link")?.textContent || "",
+        pubDate: item.querySelector("pubDate")?.textContent || "",
+      }))
+      .filter((item) => item.title && item.link);
+  } catch (e) {
+    return [];
+  }
+}
+
 async function fetchAll(tickerEntries, range_ = "2y", interval = "1d", onProgress = null) {
   const histories = {};
   const failures = [];

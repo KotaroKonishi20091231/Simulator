@@ -356,19 +356,57 @@
   }
   .detail-price { font-size: 26px; font-weight: 700; }
   .detail-score { font-size: 14px; color: var(--accent); font-weight: 600; }
-  .indicator-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+  .detail-insights {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
-  .indicator-item {
+  .insight-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     background: var(--bg);
     border: 1px solid var(--panel-border);
     border-radius: 10px;
-    padding: 8px 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 600;
   }
-  .indicator-label { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
-  .indicator-value { font-size: 15px; font-weight: 700; }
+  .insight-chip .insight-icon { font-size: 15px; flex-shrink: 0; }
+  .insight-chip.pos { color: var(--up); }
+  .insight-chip.neg { color: var(--down); }
+  .insight-chip.neutral { color: var(--text); }
+  .detail-holding-info {
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .detail-news-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-top: 1px solid var(--panel-border);
+    margin: 16px 0 10px;
+    padding-top: 14px;
+  }
+  .news-loading { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+  .news-item {
+    display: block;
+    text-decoration: none;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
+  }
+  .news-title { font-size: 12.5px; color: var(--text); line-height: 1.5; }
+  .news-date { font-size: 10.5px; color: var(--text-dim); margin-top: 4px; }
 
   #manage-overlay {
     position: fixed;
@@ -644,6 +682,7 @@
       <span class="detail-price" id="detail-price"></span>
       <span class="detail-score" id="detail-score"></span>
     </div>
+    <div id="detail-holding-section"></div>
     <div class="chart-price-range">
       <span id="detail-price-max"></span>
       <span id="detail-price-min"></span>
@@ -660,7 +699,10 @@
         <span id="detail-date-end"></span>
       </div>
     </div>
-    <div class="indicator-grid" id="detail-indicators"></div>
+    <div class="detail-insights" id="detail-indicators"></div>
+    <div class="detail-news-title">関連ニュース</div>
+    <div id="detail-news"></div>
+    <button id="detail-holding-btn" class="card-holding-btn" style="margin-top:14px;">保有を編集</button>
   </div>
 </div>
 
@@ -758,18 +800,54 @@ const refreshBtn = document.getElementById("refresh-btn");
 
 let latestPayload = null;
 
-const INDICATOR_LABELS = {
-  rsi14: "RSI (14日)",
-  macd_hist: "MACDヒストグラム",
-  pct_from_sma20: "20日線乖離率 %",
-  pct_from_sma50: "50日線乖離率 %",
-  pct_from_sma200: "200日線乖離率 %",
-  roc20: "20日変化率(ROC) %",
-  volume_ratio20: "出来高倍率(20日平均比)",
-  bollinger_pct_b: "ボリンジャー %B",
-  atr_pct: "ATR(値動きの荒さ) %",
-  pct_off_52w_high: "52週高値からの乖離率 %",
-};
+// Translate the raw indicator numbers into a handful of plain-language
+// highlights, instead of showing RSI/MACD-style jargon directly.
+function buildDetailInsights(pick) {
+  const ind = pick.indicators;
+  const insights = [];
+
+  if (ind.macd_hist > 0 && ind.roc20 > 3) {
+    insights.push({ icon: "📈", cls: "pos", text: "上昇の勢いが強い" });
+  } else if (ind.macd_hist > 0) {
+    insights.push({ icon: "↗️", cls: "pos", text: "緩やかな上昇トレンド" });
+  } else if (ind.macd_hist < 0 && ind.roc20 < -3) {
+    insights.push({ icon: "📉", cls: "neg", text: "下落の勢いが強い" });
+  } else {
+    insights.push({ icon: "➡️", cls: "neutral", text: "方向感の薄い値動き" });
+  }
+
+  if (ind.pct_off_52w_high > -5) {
+    insights.push({ icon: "🏔️", cls: "pos", text: "52週高値圏にある" });
+  } else if (ind.pct_off_52w_high < -25) {
+    insights.push({ icon: "🕳️", cls: "neg", text: `52週高値から大きく下(${ind.pct_off_52w_high.toFixed(0)}%)` });
+  } else {
+    insights.push({ icon: "📊", cls: "neutral", text: `52週高値から${ind.pct_off_52w_high.toFixed(0)}%の水準` });
+  }
+
+  if (ind.volume_ratio20 > 1.5) {
+    insights.push({ icon: "🔥", cls: "pos", text: `出来高が普段の${ind.volume_ratio20.toFixed(1)}倍で注目度上昇` });
+  }
+
+  if (ind.atr_pct > 6) {
+    insights.push({ icon: "⚡", cls: "neg", text: "値動きが荒め(ハイリスク・ハイリターン)" });
+  } else if (ind.atr_pct < 2) {
+    insights.push({ icon: "🧊", cls: "neutral", text: "値動きは落ち着いている" });
+  }
+
+  if (ind.rsi14 > 70) {
+    insights.push({ icon: "⚠️", cls: "neg", text: "短期的に買われすぎのサイン" });
+  } else if (ind.rsi14 < 30) {
+    insights.push({ icon: "💡", cls: "pos", text: "短期的に売られすぎ・反発期待" });
+  }
+
+  if (ind.pct_from_sma200 > 0) {
+    insights.push({ icon: "🧭", cls: "pos", text: "長期(200日)でも上昇基調" });
+  } else if (ind.pct_from_sma200 < -10) {
+    insights.push({ icon: "🧭", cls: "neg", text: "長期(200日)では下落基調" });
+  }
+
+  return insights.slice(0, 5);
+}
 
 function sparklinePath(closes, width, height) {
   const valid = closes.filter((c) => c !== null && c !== undefined);
@@ -1056,9 +1134,41 @@ chartSvgEl.addEventListener("pointermove", (e) => {
 chartSvgEl.addEventListener("pointerup", () => { chartDragging = false; hideChartCrosshair(); });
 chartSvgEl.addEventListener("pointercancel", () => { chartDragging = false; hideChartCrosshair(); });
 
+let detailTicker = null;
+let newsRequestToken = 0;
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function formatNewsDate(pubDate) {
+  const d = new Date(pubDate);
+  return isNaN(d.getTime()) ? "" : `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+async function loadDetailNews(ticker, name) {
+  const token = ++newsRequestToken;
+  const newsEl = document.getElementById("detail-news");
+  newsEl.innerHTML = `<div class="news-loading">ニュースを読み込み中...</div>`;
+  const items = await fetchNewsHeadlines(name || ticker);
+  if (token !== newsRequestToken) return; // user already moved to a different stock
+  if (!items.length) {
+    newsEl.innerHTML = `<div class="news-loading">関連ニュースが見つかりませんでした。</div>`;
+    return;
+  }
+  newsEl.innerHTML = items
+    .map((it) => `
+      <a class="news-item" href="${escapeHtml(it.link)}" target="_blank" rel="noopener">
+        <div class="news-title">${escapeHtml(it.title)}</div>
+        <div class="news-date">${formatNewsDate(it.pubDate)}</div>
+      </a>`)
+    .join("");
+}
+
 function openDetail(ticker) {
   const pick = findPick(ticker);
   if (!pick) return;
+  detailTicker = ticker;
 
   document.getElementById("detail-ticker").textContent = formatTickerDisplay(pick.ticker);
   document.getElementById("detail-name").textContent = pick.name;
@@ -1067,6 +1177,26 @@ function openDetail(ticker) {
     pick.ml_probability !== null && pick.ml_probability !== undefined
       ? `上昇確率 ${(pick.ml_probability * 100).toFixed(1)}%`
       : `スコア ${pick.heuristic_score.toFixed(0)}/100`;
+
+  const holding = getHolding(pick.ticker);
+  const holdingSection = document.getElementById("detail-holding-section");
+  if (holding.shares > 0) {
+    if (holding.buyPrice) {
+      const pnl = (pick.price - holding.buyPrice) * holding.shares;
+      const pnlPct = ((pick.price - holding.buyPrice) / holding.buyPrice) * 100;
+      const isUp = pnl >= 0;
+      const sign = isUp ? "+" : "-";
+      holdingSection.innerHTML = `
+        <div class="detail-holding-info">
+          保有 ${holding.shares.toLocaleString()}株(購入 ${formatPrice(holding.buyPrice)})
+          <div class="pnl-badge ${isUp ? "pnl-up" : "pnl-down"}">${isUp ? "▲" : "▼"} ${sign}${formatPrice(Math.abs(pnl))} <span class="pnl-pct">(${sign}${Math.abs(pnlPct).toFixed(1)}%)</span></div>
+        </div>`;
+    } else {
+      holdingSection.innerHTML = `<div class="detail-holding-info">保有 ${holding.shares.toLocaleString()}株(評価額 ${formatPrice(holding.shares * pick.price)}) ・ 購入価格未設定</div>`;
+    }
+  } else {
+    holdingSection.innerHTML = "";
+  }
 
   const dates = pick.recent_dates || [];
   currentChartPoints = buildChartPoints(dates, pick.recent_closes, 300, 120);
@@ -1088,13 +1218,17 @@ function openDetail(ticker) {
     document.getElementById("detail-price-min").textContent = "";
   }
 
-  document.getElementById("detail-indicators").innerHTML = Object.entries(INDICATOR_LABELS)
-    .map(([key, label]) => `
-      <div class="indicator-item">
-        <div class="indicator-label">${label}</div>
-        <div class="indicator-value">${pick.indicators[key].toFixed(2)}</div>
+  document.getElementById("detail-holding-btn").dataset.ticker = pick.ticker;
+
+  document.getElementById("detail-indicators").innerHTML = buildDetailInsights(pick)
+    .map((i) => `
+      <div class="insight-chip ${i.cls}">
+        <span class="insight-icon">${i.icon}</span>
+        <span>${i.text}</span>
       </div>`)
     .join("");
+
+  loadDetailNews(pick.ticker, pick.name);
 
   history.pushState({ detail: true }, "");
   document.getElementById("detail-overlay").classList.add("open");
