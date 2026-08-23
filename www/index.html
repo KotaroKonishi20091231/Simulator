@@ -230,6 +230,18 @@
     font-size: 11px;
     font-weight: 700;
   }
+  .card-holding-btn {
+    display: block;
+    margin-top: 7px;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
   .sparkline { flex-shrink: 0; }
   #disclaimer {
     font-size: 11px;
@@ -827,6 +839,7 @@ function renderCard(pick) {
   const reversalBadge = loadSettings().showReversalBadge && detectReversal(pick.recent_closes)
     ? `<div class="reversal-badge">📈 反発シグナル(急落からの回復)</div>` : "";
   const holdingRow = renderHoldingRow(pick);
+  const holdingBtnLabel = getHolding(pick.ticker).shares > 0 ? "保有を編集" : "保有を設定";
   return `
     <div class="card" data-ticker="${pick.ticker}">
       ${renderSparkline(pick.recent_closes)}
@@ -842,6 +855,7 @@ function renderCard(pick) {
         </div>
         ${holdingRow}
         ${reversalBadge}
+        <button class="card-holding-btn" data-ticker="${pick.ticker}">${holdingBtnLabel}</button>
       </div>
     </div>`;
 }
@@ -851,17 +865,24 @@ let showHoldingsOnly = false;
 function render() {
   if (!latestPayload) return;
   const maxPrice = loadMaxPrice();
-  const allPicks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
-  // The watchlist itself never drops a ticker just because its price moved,
-  // but anything above the current cap is hidden from view until it's back
-  // under the cap (or the cap is raised again in 設定).
-  let picks = allPicks.filter((p) => p.price <= maxPrice);
+  let picks;
   if (showHoldingsOnly) {
-    picks = picks.filter((p) => getHolding(p.ticker).shares > 0);
+    // Holdings should never be hidden by the price cap — that cap is only
+    // meant to narrow down new discoveries, not your own portfolio. Source
+    // from the full universe (every tracked ticker's live data) so a held
+    // stock shows up even if it never qualified as a "cheap" watchlist pick.
+    const universePicks = (latestPayload.universe && latestPayload.universe[MARKET]) || [];
+    picks = universePicks.filter((p) => getHolding(p.ticker).shares > 0);
+  } else {
+    const allPicks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
+    // The watchlist itself never drops a ticker just because its price moved,
+    // but anything above the current cap is hidden from view until it's back
+    // under the cap (or the cap is raised again in 設定).
+    picks = allPicks.filter((p) => p.price <= maxPrice);
   }
   if (picks.length === 0) {
     listEl.innerHTML = showHoldingsOnly
-      ? `<div id="status">保有中の銘柄がありません。「銘柄管理」から保有株を登録できます。</div>`
+      ? `<div id="status">保有中の銘柄がありません。カードの「保有を設定」から登録できます。</div>`
       : `<div id="status">条件(¥${maxPrice.toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
     return;
   }
@@ -898,6 +919,11 @@ function initFromCache() {
 }
 
 document.addEventListener("click", (e) => {
+  const holdingBtn = e.target.closest(".card-holding-btn");
+  if (holdingBtn) {
+    openHoldingEdit(holdingBtn.dataset.ticker);
+    return;
+  }
   const card = e.target.closest(".card[data-ticker]");
   if (card) openDetail(card.dataset.ticker);
 });
