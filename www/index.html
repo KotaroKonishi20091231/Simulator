@@ -356,26 +356,6 @@
   }
   .detail-price { font-size: 26px; font-weight: 700; }
   .detail-score { font-size: 14px; color: var(--accent); font-weight: 600; }
-  .detail-insights {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .insight-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .insight-chip .insight-icon { font-size: 15px; flex-shrink: 0; }
-  .insight-chip.pos { color: var(--up); }
-  .insight-chip.neg { color: var(--down); }
-  .insight-chip.neutral { color: var(--text); }
   .detail-holding-info {
     background: var(--bg);
     border: 1px solid var(--panel-border);
@@ -699,7 +679,6 @@
         <span id="detail-date-end"></span>
       </div>
     </div>
-    <div class="detail-insights" id="detail-indicators"></div>
     <div class="detail-news-title">関連ニュース</div>
     <div id="detail-news"></div>
     <button id="detail-holding-btn" class="card-holding-btn" style="margin-top:14px;">保有を編集</button>
@@ -799,55 +778,6 @@ const disclaimerEl = document.getElementById("disclaimer");
 const refreshBtn = document.getElementById("refresh-btn");
 
 let latestPayload = null;
-
-// Translate the raw indicator numbers into a handful of plain-language
-// highlights, instead of showing RSI/MACD-style jargon directly.
-function buildDetailInsights(pick) {
-  const ind = pick.indicators;
-  const insights = [];
-
-  if (ind.macd_hist > 0 && ind.roc20 > 3) {
-    insights.push({ icon: "📈", cls: "pos", text: "上昇の勢いが強い" });
-  } else if (ind.macd_hist > 0) {
-    insights.push({ icon: "↗️", cls: "pos", text: "緩やかな上昇トレンド" });
-  } else if (ind.macd_hist < 0 && ind.roc20 < -3) {
-    insights.push({ icon: "📉", cls: "neg", text: "下落の勢いが強い" });
-  } else {
-    insights.push({ icon: "➡️", cls: "neutral", text: "方向感の薄い値動き" });
-  }
-
-  if (ind.pct_off_52w_high > -5) {
-    insights.push({ icon: "🏔️", cls: "pos", text: "52週高値圏にある" });
-  } else if (ind.pct_off_52w_high < -25) {
-    insights.push({ icon: "🕳️", cls: "neg", text: `52週高値から大きく下(${ind.pct_off_52w_high.toFixed(0)}%)` });
-  } else {
-    insights.push({ icon: "📊", cls: "neutral", text: `52週高値から${ind.pct_off_52w_high.toFixed(0)}%の水準` });
-  }
-
-  if (ind.volume_ratio20 > 1.5) {
-    insights.push({ icon: "🔥", cls: "pos", text: `出来高が普段の${ind.volume_ratio20.toFixed(1)}倍で注目度上昇` });
-  }
-
-  if (ind.atr_pct > 6) {
-    insights.push({ icon: "⚡", cls: "neg", text: "値動きが荒め(ハイリスク・ハイリターン)" });
-  } else if (ind.atr_pct < 2) {
-    insights.push({ icon: "🧊", cls: "neutral", text: "値動きは落ち着いている" });
-  }
-
-  if (ind.rsi14 > 70) {
-    insights.push({ icon: "⚠️", cls: "neg", text: "短期的に買われすぎのサイン" });
-  } else if (ind.rsi14 < 30) {
-    insights.push({ icon: "💡", cls: "pos", text: "短期的に売られすぎ・反発期待" });
-  }
-
-  if (ind.pct_from_sma200 > 0) {
-    insights.push({ icon: "🧭", cls: "pos", text: "長期(200日)でも上昇基調" });
-  } else if (ind.pct_from_sma200 < -10) {
-    insights.push({ icon: "🧭", cls: "neg", text: "長期(200日)では下落基調" });
-  }
-
-  return insights.slice(0, 5);
-}
 
 function sparklinePath(closes, width, height) {
   const valid = closes.filter((c) => c !== null && c !== undefined);
@@ -1219,14 +1149,6 @@ function openDetail(ticker) {
   }
 
   document.getElementById("detail-holding-btn").dataset.ticker = pick.ticker;
-
-  document.getElementById("detail-indicators").innerHTML = buildDetailInsights(pick)
-    .map((i) => `
-      <div class="insight-chip ${i.cls}">
-        <span class="insight-icon">${i.icon}</span>
-        <span>${i.text}</span>
-      </div>`)
-    .join("");
 
   loadDetailNews(pick.ticker, pick.name);
 
