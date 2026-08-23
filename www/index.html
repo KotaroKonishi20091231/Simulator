@@ -217,8 +217,19 @@
     font-size: 11px;
     color: var(--text-dim);
   }
-  .holding-row.pnl-up { color: var(--up); font-weight: 600; }
-  .holding-row.pnl-down { color: var(--down); font-weight: 600; }
+  .pnl-badge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .pnl-badge.pnl-up { color: var(--up); background: rgba(34, 197, 94, 0.15); }
+  .pnl-badge.pnl-down { color: var(--down); background: rgba(239, 68, 68, 0.15); }
+  .pnl-badge .pnl-pct { font-size: 12px; font-weight: 700; opacity: 0.85; }
   .reversal-badge {
     margin-top: 7px;
     display: inline-block;
@@ -454,10 +465,12 @@
     left: 0;
     right: 0;
     bottom: 0;
+    max-height: 88vh;
+    overflow-y: auto;
     background: var(--panel);
     border-top: 1px solid var(--panel-border);
     border-radius: 20px 20px 0 0;
-    padding: 18px 18px max(20px, env(safe-area-inset-bottom));
+    padding: max(18px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
     z-index: 21;
     box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
     transform: translateY(100%);
@@ -519,10 +532,12 @@
     left: 0;
     right: 0;
     bottom: 0;
+    max-height: 88vh;
+    overflow-y: auto;
     background: var(--panel);
     border-top: 1px solid var(--panel-border);
     border-radius: 20px 20px 0 0;
-    padding: 18px 18px max(20px, env(safe-area-inset-bottom));
+    padding: max(18px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
     z-index: 21;
     box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
     transform: translateY(100%);
@@ -818,6 +833,10 @@ function detectReversal(recentCloses) {
   return drawdown >= settings.reversalMinDrawdownPct / 100 && recovery >= settings.reversalMinRecoveryPct / 100;
 }
 
+function formatTickerDisplay(ticker) {
+  return (ticker || "").replace(/\.T$/, "");
+}
+
 function renderHoldingRow(pick) {
   const { shares, buyPrice } = getHolding(pick.ticker);
   if (shares <= 0) return "";
@@ -826,9 +845,13 @@ function renderHoldingRow(pick) {
   }
   const pnl = (pick.price - buyPrice) * shares;
   const pnlPct = ((pick.price - buyPrice) / buyPrice) * 100;
-  const sign = pnl >= 0 ? "+" : "-";
-  const cls = pnl >= 0 ? "pnl-up" : "pnl-down";
-  return `<div class="holding-row ${cls}">保有 ${shares.toLocaleString()}株 ・ 損益 ${sign}${formatPrice(Math.abs(pnl))} (${sign}${Math.abs(pnlPct).toFixed(1)}%)</div>`;
+  const isUp = pnl >= 0;
+  const sign = isUp ? "+" : "-";
+  const cls = isUp ? "pnl-up" : "pnl-down";
+  const arrow = isUp ? "▲" : "▼";
+  return `
+    <div class="holding-row">保有 ${shares.toLocaleString()}株(評価額 ${formatPrice(shares * pick.price)})</div>
+    <div class="pnl-badge ${cls}">${arrow} ${sign}${formatPrice(Math.abs(pnl))} <span class="pnl-pct">(${sign}${Math.abs(pnlPct).toFixed(1)}%)</span></div>`;
 }
 
 function renderCard(pick) {
@@ -839,13 +862,12 @@ function renderCard(pick) {
   const reversalBadge = loadSettings().showReversalBadge && detectReversal(pick.recent_closes)
     ? `<div class="reversal-badge">📈 反発シグナル(急落からの回復)</div>` : "";
   const holdingRow = renderHoldingRow(pick);
-  const holdingBtnLabel = getHolding(pick.ticker).shares > 0 ? "保有を編集" : "保有を設定";
   return `
     <div class="card" data-ticker="${pick.ticker}">
       ${renderSparkline(pick.recent_closes)}
       <div class="card-main">
         <div class="card-title">
-          <span class="ticker">${pick.ticker}</span>
+          <span class="ticker">${formatTickerDisplay(pick.ticker)}</span>
           <span class="price">${formatPrice(pick.price)}</span>
         </div>
         <div class="name">${pick.name}</div>
@@ -855,12 +877,32 @@ function renderCard(pick) {
         </div>
         ${holdingRow}
         ${reversalBadge}
-        <button class="card-holding-btn" data-ticker="${pick.ticker}">${holdingBtnLabel}</button>
+        <button class="card-holding-btn" data-ticker="${pick.ticker}">保有を編集</button>
       </div>
     </div>`;
 }
 
 let showHoldingsOnly = false;
+
+function getAllTabPicks() {
+  if (!latestPayload) return [];
+  const maxPrice = loadMaxPrice();
+  const allPicks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
+  // The watchlist itself never drops a ticker just because its price moved,
+  // but anything above the current cap is hidden from view until it's back
+  // under the cap (or the cap is raised again in 設定).
+  let picks = allPicks.filter((p) => p.price <= maxPrice);
+  // "added" keeps the watchlist's own order (newest find first); "score"
+  // re-sorts a copy for display without touching the underlying order.
+  if (loadSettings().sortOrder === "score") {
+    picks = [...picks].sort((a, b) => {
+      const sa = a.ml_probability ?? a.heuristic_score;
+      const sb = b.ml_probability ?? b.heuristic_score;
+      return sb - sa;
+    });
+  }
+  return picks;
+}
 
 function render() {
   if (!latestPayload) return;
@@ -874,26 +916,13 @@ function render() {
     const universePicks = (latestPayload.universe && latestPayload.universe[MARKET]) || [];
     picks = universePicks.filter((p) => getHolding(p.ticker).shares > 0);
   } else {
-    const allPicks = (latestPayload.markets && latestPayload.markets[MARKET]) || [];
-    // The watchlist itself never drops a ticker just because its price moved,
-    // but anything above the current cap is hidden from view until it's back
-    // under the cap (or the cap is raised again in 設定).
-    picks = allPicks.filter((p) => p.price <= maxPrice);
+    picks = getAllTabPicks();
   }
   if (picks.length === 0) {
     listEl.innerHTML = showHoldingsOnly
       ? `<div id="status">保有中の銘柄がありません。カードの「保有を設定」から登録できます。</div>`
       : `<div id="status">条件(¥${maxPrice.toLocaleString()}以下)に合う銘柄が見つかりませんでした</div>`;
     return;
-  }
-  // "added" keeps the watchlist's own order (newest find first); "score"
-  // re-sorts a copy for display without touching the underlying order.
-  if (loadSettings().sortOrder === "score") {
-    picks = [...picks].sort((a, b) => {
-      const sa = a.ml_probability ?? a.heuristic_score;
-      const sb = b.ml_probability ?? b.heuristic_score;
-      return sb - sa;
-    });
   }
   let html = picks.map((p) => renderCard(p)).join("");
   listEl.innerHTML = html;
@@ -1031,7 +1060,7 @@ function openDetail(ticker) {
   const pick = findPick(ticker);
   if (!pick) return;
 
-  document.getElementById("detail-ticker").textContent = pick.ticker;
+  document.getElementById("detail-ticker").textContent = formatTickerDisplay(pick.ticker);
   document.getElementById("detail-name").textContent = pick.name;
   document.getElementById("detail-price").textContent = formatPrice(pick.price);
   document.getElementById("detail-score").textContent =
@@ -1109,11 +1138,7 @@ const manageListEl = document.getElementById("manage-list");
 
 function sortedTickersForManage() {
   const tickers = loadTickers();
-  const maxPrice = loadMaxPrice();
-  const displayedTickers = ((latestPayload && latestPayload.markets && latestPayload.markets[MARKET]) || [])
-    .filter((p) => p.price <= maxPrice)
-    .map((p) => p.ticker);
-  const displayedOrder = new Map(displayedTickers.map((ticker, i) => [ticker, i]));
+  const displayedOrder = new Map(getAllTabPicks().map((p, i) => [p.ticker, i]));
 
   const displayed = [];
   const rest = [];
@@ -1150,7 +1175,7 @@ function renderManageList() {
     <div class="manage-row" data-row-ticker="${t.ticker}">
       <div class="manage-row-top">
         <div class="manage-row-main">
-          <div class="manage-ticker">${t.ticker} <span class="manage-price">${priceLabel}</span></div>
+          <div class="manage-ticker">${formatTickerDisplay(t.ticker)} <span class="manage-price">${priceLabel}</span></div>
           <div class="manage-name">${t.name}</div>
           <div class="manage-holding-summary">${summary}</div>
         </div>
@@ -1199,7 +1224,7 @@ const holdingBuyPriceInput = document.getElementById("holding-buyprice-input");
 function openHoldingEdit(ticker) {
   holdingEditTicker = ticker;
   const holding = getHolding(ticker);
-  document.getElementById("holding-edit-ticker").textContent = ticker;
+  document.getElementById("holding-edit-ticker").textContent = formatTickerDisplay(ticker);
   holdingSharesInput.value = holding.shares || "";
   holdingBuyPriceInput.value = holding.buyPrice || "";
   history.pushState({ holdingEdit: true }, "");
