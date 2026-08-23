@@ -387,15 +387,6 @@
   }
   .news-title { font-size: 12.5px; color: var(--text); line-height: 1.5; }
   .news-date { font-size: 10.5px; color: var(--text-dim); margin-top: 4px; }
-  .ai-opinion-box {
-    background: var(--bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 10px;
-    padding: 12px 13px;
-  }
-  #detail-ai-opinion { font-size: 13px; color: var(--text); line-height: 1.7; }
-  .ai-opinion-note { font-size: 10.5px; color: var(--text-dim); margin-top: 8px; }
-
   #manage-overlay {
     position: fixed;
     inset: 0;
@@ -689,11 +680,6 @@
     </div>
     <div class="detail-news-title">関連ニュース</div>
     <div id="detail-news"></div>
-    <div class="detail-news-title">AIの見解</div>
-    <div class="ai-opinion-box">
-      <div id="detail-ai-opinion"></div>
-      <div class="ai-opinion-note">※価格・出来高データからの自動推測です。実際のニュース内容は読んでいないため確度は低く、参考程度にご覧ください</div>
-    </div>
     <button id="detail-holding-btn" class="card-holding-btn" style="margin-top:14px;">保有を編集</button>
   </div>
 </div>
@@ -795,57 +781,6 @@ let latestPayload = null;
 // A rule-based "AI opinion" paragraph, built from the same price/volume
 // indicators used elsewhere in the app — not a real generative AI (no paid
 // API), but phrased as a short flowing comment instead of a jargon table.
-// A speculative guess at *why* the stock has been moving, inferred only from
-// how big the move was and whether volume spiked alongside it. This is NOT
-// based on reading any actual news — real reasons need the headlines above.
-function buildReasonSpeculation(pick) {
-  const ind = pick.indicators;
-  const movingUp = ind.roc20 >= 0;
-  const bigMove = Math.abs(ind.roc20) > 5;
-  const volSpike = ind.volume_ratio20 > 1.5;
-
-  if (bigMove && volSpike) {
-    return movingUp
-      ? "出来高を伴って大きく上昇しており、決算発表や好材料のニュースが出た可能性があります(推測)"
-      : "出来高を伴って大きく下落しており、悪材料のニュースが出た可能性があります(推測)";
-  }
-  if (bigMove && !volSpike) {
-    return movingUp
-      ? "出来高の急増は見られず、個別ニュースというより市場全体の地合いに沿った上昇の可能性があります(推測)"
-      : "出来高の急増は見られず、個別ニュースというより利益確定売りや市場全体の地合いの可能性があります(推測)";
-  }
-  return "直近で大きな価格変動は見られず、これといった材料は出ていない可能性があります(推測)";
-}
-
-function buildAiOpinion(pick) {
-  const ind = pick.indicators;
-  const parts = [buildReasonSpeculation(pick)];
-
-  if (ind.macd_hist > 0 && ind.roc20 > 3) parts.push("直近では上昇の勢いが強く出ています");
-  else if (ind.macd_hist > 0) parts.push("直近では緩やかな上昇トレンドにあります");
-  else if (ind.macd_hist < 0 && ind.roc20 < -3) parts.push("直近では下落の勢いが強く出ています");
-  else parts.push("直近は方向感の薄い値動きです");
-
-  if (ind.pct_off_52w_high > -5) parts.push("52週高値圏で推移しています");
-  else if (ind.pct_off_52w_high < -25) parts.push(`52週高値からは${ind.pct_off_52w_high.toFixed(0)}%と大きく離れた水準です`);
-  else parts.push(`52週高値からは${ind.pct_off_52w_high.toFixed(0)}%の水準です`);
-
-  if (ind.volume_ratio20 > 1.5) {
-    parts.push(`出来高は普段の${ind.volume_ratio20.toFixed(1)}倍に増えており、注目度が高まっている可能性があります`);
-  }
-
-  if (ind.atr_pct > 6) parts.push("値動きは荒めでハイリスク・ハイリターンな展開です");
-  else if (ind.atr_pct < 2) parts.push("値動きは落ち着いています");
-
-  if (ind.rsi14 > 70) parts.push("短期的には買われすぎのサインが出ています");
-  else if (ind.rsi14 < 30) parts.push("短期的には売られすぎで反発が期待される水準です");
-
-  if (ind.pct_from_sma200 > 0) parts.push("長期(200日線)で見ても上昇基調です");
-  else if (ind.pct_from_sma200 < -10) parts.push("長期(200日線)では下落基調が続いています");
-
-  return parts.join("。") + "。";
-}
-
 function sparklinePath(closes, width, height) {
   const valid = closes.filter((c) => c !== null && c !== undefined);
   if (valid.length < 2) return { path: "", up: true };
@@ -1216,7 +1151,6 @@ function openDetail(ticker) {
   }
 
   document.getElementById("detail-holding-btn").dataset.ticker = pick.ticker;
-  document.getElementById("detail-ai-opinion").textContent = buildAiOpinion(pick);
 
   loadDetailNews(pick.ticker, pick.name);
 
