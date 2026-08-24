@@ -1428,13 +1428,20 @@ const addFormEl = document.getElementById("add-form");
 const addTickerInput = document.getElementById("add-ticker-input");
 const addSubmitBtn = document.getElementById("add-submit-btn");
 const addStatusEl = document.getElementById("add-status");
+const addSearchResultsEl = document.getElementById("add-search-results");
 
 addToggleBtn.addEventListener("click", () => {
   addFormEl.classList.toggle("open");
   if (addFormEl.classList.contains("open")) addTickerInput.focus();
 });
 
-const addSearchResultsEl = document.getElementById("add-search-results");
+// Search results only ever match the text they were found for — as soon as
+// the input changes at all, drop the stale list rather than leave it showing.
+addTickerInput.addEventListener("input", () => {
+  addSearchResultsEl.innerHTML = "";
+  addStatusEl.textContent = "";
+  addStatusEl.className = "";
+});
 
 async function runAddTicker(rawOrTicker, knownName) {
   addSearchResultsEl.innerHTML = "";
