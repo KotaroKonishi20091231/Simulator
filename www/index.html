@@ -648,7 +648,7 @@
   </div>
   <form id="add-form">
     <input id="add-ticker-input" type="text" placeholder="銘柄コード(7203)か会社名(英語 例: Toyota)" autocomplete="off">
-    <button id="add-submit-btn" type="submit">追加</button>
+    <button id="add-submit-btn" type="submit">検索</button>
   </form>
   <div id="add-search-results"></div>
   <div id="add-status"></div>
@@ -1465,7 +1465,7 @@ async function runAddTicker(rawOrTicker, knownName) {
     addStatusEl.textContent = e.message || "追加に失敗しました。";
   } finally {
     addSubmitBtn.disabled = false;
-    addSubmitBtn.textContent = "追加";
+    addSubmitBtn.textContent = "検索";
   }
 }
 
@@ -1474,16 +1474,9 @@ addFormEl.addEventListener("submit", async (e) => {
   const raw = addTickerInput.value.trim();
   if (!raw) return;
 
-  // JP ticker codes always start with a digit (e.g. 7203, or newer codes
-  // like 130A) — anything else (including short English words like "Sony")
-  // must go through the search-and-tap-a-result flow, never a direct add.
-  const looksLikeTickerCode = /^[0-9][0-9a-z]{2,4}(\.t)?$/i.test(raw);
-  if (looksLikeTickerCode) {
-    await runAddTicker(raw);
-    return;
-  }
-
-  // Treat anything else as a company-name keyword search.
+  // Always search first (works for both ticker codes and company-name
+  // keywords) and let the user tap the right candidate — never add anything
+  // without an explicit tap, so a bad guess never silently ends up tracked.
   addSearchResultsEl.innerHTML = "";
   addSubmitBtn.disabled = true;
   addSubmitBtn.textContent = "検索中...";
@@ -1492,11 +1485,11 @@ addFormEl.addEventListener("submit", async (e) => {
 
   const results = await searchJpTickers(raw);
   addSubmitBtn.disabled = false;
-  addSubmitBtn.textContent = "追加";
+  addSubmitBtn.textContent = "検索";
 
   if (!results.length) {
     addStatusEl.className = "error";
-    addStatusEl.textContent = `「${raw}」に一致する日本株が見つかりませんでした。英語の会社名(例: Toyota, Sony)で試してみてください。`;
+    addStatusEl.textContent = `「${raw}」に一致する日本株が見つかりませんでした。銘柄コード、または英語の会社名(例: Toyota, Sony)で試してみてください。`;
     return;
   }
   addSearchResultsEl.innerHTML = results
