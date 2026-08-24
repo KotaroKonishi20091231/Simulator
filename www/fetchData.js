@@ -100,6 +100,24 @@ async function fetchCompanyName(ticker) {
   }
 }
 
+async function searchJpTickers(query, limit = 8) {
+  // Yahoo's search endpoint rejects queries containing Japanese characters
+  // (kanji/kana) with a 400 — it only works with English/romaji company
+  // names (e.g. "Toyota", "Sony"), even for JPX-listed results.
+  try {
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=${limit}&newsCount=0`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const quotes = data.quotes || [];
+    return quotes
+      .filter((q) => q.quoteType === "EQUITY" && q.symbol && q.symbol.endsWith(".T"))
+      .map((q) => ({ ticker: q.symbol, name: q.longname || q.shortname || q.symbol }));
+  } catch (e) {
+    return [];
+  }
+}
+
 async function fetchNewsHeadlines(query, limit = 5) {
   try {
     const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ja&gl=JP&ceid=JP:ja`;

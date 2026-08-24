@@ -307,7 +307,7 @@ function normalizeJpTicker(raw) {
   return t;
 }
 
-async function addTicker(rawInput) {
+async function addTicker(rawInput, knownName) {
   const raw = (rawInput || "").trim();
   if (!raw) throw new Error("銘柄コードを入力してください");
   const ticker = normalizeJpTicker(raw);
@@ -316,7 +316,7 @@ async function addTicker(rawInput) {
   const tickers = loadTickers();
   if (tickers.some((t) => t.ticker === ticker)) throw new Error(`${ticker} は既に追加済みです`);
 
-  const name = (await fetchCompanyName(ticker)) || ticker;
+  const name = knownName || (await fetchCompanyName(ticker)) || ticker;
   const cleaned = tickers.map(({ market, ...rest }) => rest);
   cleaned.push({ ticker, name });
   saveTickers(cleaned);
