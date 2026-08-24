@@ -314,6 +314,14 @@
     transition: transform 0.2s ease-out;
   }
   #detail-overlay.open #detail-sheet { transform: translateY(0); }
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--panel-border);
+    border-radius: 999px;
+    margin: 0 auto 14px;
+    touch-action: none;
+  }
   .detail-header {
     display: flex;
     justify-content: space-between;
@@ -665,6 +673,7 @@
 
 <div id="detail-overlay">
   <div id="detail-sheet">
+    <div class="sheet-handle"></div>
     <div class="detail-header">
       <div>
         <div class="detail-title" id="detail-ticker"></div>
@@ -701,6 +710,7 @@
 
 <div id="manage-overlay">
   <div id="manage-sheet">
+    <div class="sheet-handle"></div>
     <div class="detail-header">
       <div class="detail-title">追跡銘柄の管理</div>
       <button id="manage-close">✕</button>
@@ -711,6 +721,7 @@
 
 <div id="holding-overlay">
   <div id="holding-sheet">
+    <div class="sheet-handle"></div>
     <div class="detail-header">
       <div>
         <div class="detail-title">保有株を編集</div>
@@ -735,6 +746,7 @@
 
 <div id="settings-overlay">
   <div id="settings-sheet">
+    <div class="sheet-handle"></div>
     <div class="detail-header">
       <div class="detail-title">設定</div>
       <button id="settings-close">✕</button>
@@ -1082,6 +1094,28 @@ chartSvgEl.addEventListener("pointerup", () => { chartDragging = false; hideChar
 chartSvgEl.addEventListener("pointercancel", () => { chartDragging = false; hideChartCrosshair(); });
 
 let detailTicker = null;
+
+function renderDetailHoldingSection(pick) {
+  const holding = getHolding(pick.ticker);
+  const holdingSection = document.getElementById("detail-holding-section");
+  if (holding.shares > 0) {
+    if (holding.buyPrice) {
+      const pnl = (pick.price - holding.buyPrice) * holding.shares;
+      const pnlPct = ((pick.price - holding.buyPrice) / holding.buyPrice) * 100;
+      const isUp = pnl >= 0;
+      const sign = isUp ? "+" : "-";
+      holdingSection.innerHTML = `
+        <div class="detail-holding-info">
+          保有 ${holding.shares.toLocaleString()}株(購入 ${formatPrice(holding.buyPrice)})
+          <div class="pnl-badge ${isUp ? "pnl-up" : "pnl-down"}">${isUp ? "▲" : "▼"} ${sign}${formatPrice(Math.abs(pnl))} <span class="pnl-pct">(${sign}${Math.abs(pnlPct).toFixed(1)}%)</span></div>
+        </div>`;
+    } else {
+      holdingSection.innerHTML = `<div class="detail-holding-info">保有 ${holding.shares.toLocaleString()}株(評価額 ${formatPrice(holding.shares * pick.price)}) ・ 購入価格未設定</div>`;
+    }
+  } else {
+    holdingSection.innerHTML = "";
+  }
+}
 let newsRequestToken = 0;
 
 function escapeHtml(s) {
@@ -1125,25 +1159,7 @@ function openDetail(ticker) {
       ? `上昇確率 ${(pick.ml_probability * 100).toFixed(1)}%`
       : `スコア ${pick.heuristic_score.toFixed(0)}/100`;
 
-  const holding = getHolding(pick.ticker);
-  const holdingSection = document.getElementById("detail-holding-section");
-  if (holding.shares > 0) {
-    if (holding.buyPrice) {
-      const pnl = (pick.price - holding.buyPrice) * holding.shares;
-      const pnlPct = ((pick.price - holding.buyPrice) / holding.buyPrice) * 100;
-      const isUp = pnl >= 0;
-      const sign = isUp ? "+" : "-";
-      holdingSection.innerHTML = `
-        <div class="detail-holding-info">
-          保有 ${holding.shares.toLocaleString()}株(購入 ${formatPrice(holding.buyPrice)})
-          <div class="pnl-badge ${isUp ? "pnl-up" : "pnl-down"}">${isUp ? "▲" : "▼"} ${sign}${formatPrice(Math.abs(pnl))} <span class="pnl-pct">(${sign}${Math.abs(pnlPct).toFixed(1)}%)</span></div>
-        </div>`;
-    } else {
-      holdingSection.innerHTML = `<div class="detail-holding-info">保有 ${holding.shares.toLocaleString()}株(評価額 ${formatPrice(holding.shares * pick.price)}) ・ 購入価格未設定</div>`;
-    }
-  } else {
-    holdingSection.innerHTML = "";
-  }
+  renderDetailHoldingSection(pick);
 
   const dates = pick.recent_dates || [];
   currentChartPoints = buildChartPoints(dates, pick.recent_closes, 300, 120);
@@ -1169,40 +1185,71 @@ function openDetail(ticker) {
 
   loadDetailNews(pick.ticker, pick.name);
 
-  history.pushState({ detail: true }, "");
-  document.getElementById("detail-overlay").classList.add("open");
+  pushOverlay("detail-overlay");
 }
 
-function closeOverlays(fromPopstate) {
-  const detailOverlay = document.getElementById("detail-overlay");
-  const manageOverlay = document.getElementById("manage-overlay");
-  const holdingOverlay = document.getElementById("holding-overlay");
-  let closedSomething = false;
-  if (detailOverlay.classList.contains("open")) {
-    detailOverlay.classList.remove("open");
-    hideChartCrosshair();
-    closedSomething = true;
-  }
-  if (manageOverlay.classList.contains("open")) {
-    manageOverlay.classList.remove("open");
-    closedSomething = true;
-  }
-  if (holdingOverlay.classList.contains("open")) {
-    holdingOverlay.classList.remove("open");
-    closedSomething = true;
-  }
-  const settingsOverlay = document.getElementById("settings-overlay");
-  if (settingsOverlay.classList.contains("open")) {
-    settingsOverlay.classList.remove("open");
-    closedSomething = true;
-  }
-  if (closedSomething && !fromPopstate) history.back();
+// Overlays form a proper stack: each open pushes exactly one history entry,
+// and each close pops exactly one — whether opened from the main list or
+// stacked on top of another sheet (e.g. holding-edit opened from detail).
+// Closing every open overlay at once on a single back-press (the old
+// behaviour) desynced the history depth from what was on screen, which made
+// the hardware back button behave inconsistently.
+let overlayStack = [];
+
+function pushOverlay(id) {
+  document.getElementById(id).classList.add("open");
+  overlayStack.push(id);
+  history.pushState({ overlay: id }, "");
 }
 
-window.addEventListener("popstate", () => closeOverlays(true));
-document.getElementById("detail-close").addEventListener("click", () => closeOverlays(false));
+function closeTopOverlay(fromPopstate) {
+  const id = overlayStack.pop();
+  if (!id) return;
+  document.getElementById(id).classList.remove("open");
+  if (id === "detail-overlay") hideChartCrosshair();
+  if (!fromPopstate) history.back();
+}
+
+window.addEventListener("popstate", () => closeTopOverlay(true));
+document.getElementById("detail-close").addEventListener("click", () => closeTopOverlay(false));
 document.getElementById("detail-overlay").addEventListener("click", (e) => {
-  if (e.target.id === "detail-overlay") closeOverlays(false);
+  if (e.target.id === "detail-overlay") closeTopOverlay(false);
+});
+
+// Swipe-down-to-dismiss: drag from the small handle bar at the top of a
+// sheet. Only the handle starts the gesture, so it never fights with
+// scrolling the sheet's own (possibly long) content.
+function setupSheetDrag(sheetEl) {
+  const handleEl = sheetEl.querySelector(".sheet-handle");
+  if (!handleEl) return;
+  let dragging = false;
+  let startY = 0;
+
+  handleEl.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    startY = e.clientY;
+    sheetEl.style.transition = "none";
+    handleEl.setPointerCapture(e.pointerId);
+  });
+  handleEl.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dy = Math.max(0, e.clientY - startY);
+    sheetEl.style.transform = `translateY(${dy}px)`;
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    sheetEl.style.transition = "";
+    const dy = Math.max(0, e.clientY - startY);
+    sheetEl.style.transform = "";
+    if (dy > 100) closeTopOverlay(false);
+  };
+  handleEl.addEventListener("pointerup", endDrag);
+  handleEl.addEventListener("pointercancel", endDrag);
+}
+
+["detail-sheet", "manage-sheet", "holding-sheet", "settings-sheet"].forEach((id) => {
+  setupSheetDrag(document.getElementById(id));
 });
 
 const manageToggleBtn = document.getElementById("manage-toggle-btn");
@@ -1261,12 +1308,11 @@ function renderManageList() {
 
 manageToggleBtn.addEventListener("click", () => {
   renderManageList();
-  history.pushState({ manage: true }, "");
-  manageOverlayEl.classList.add("open");
+  pushOverlay("manage-overlay");
 });
-document.getElementById("manage-close").addEventListener("click", () => closeOverlays(false));
+document.getElementById("manage-close").addEventListener("click", () => closeTopOverlay(false));
 manageOverlayEl.addEventListener("click", (e) => {
-  if (e.target.id === "manage-overlay") closeOverlays(false);
+  if (e.target.id === "manage-overlay") closeTopOverlay(false);
 });
 
 manageListEl.addEventListener("click", (e) => {
@@ -1300,8 +1346,7 @@ function openHoldingEdit(ticker) {
   document.getElementById("holding-edit-ticker").textContent = formatTickerDisplay(ticker);
   holdingSharesInput.value = holding.shares || "";
   holdingBuyPriceInput.value = holding.buyPrice || "";
-  history.pushState({ holdingEdit: true }, "");
-  holdingOverlayEl.classList.add("open");
+  pushOverlay("holding-overlay");
 }
 
 manageListEl.addEventListener("click", (e) => {
@@ -1310,26 +1355,33 @@ manageListEl.addEventListener("click", (e) => {
   openHoldingEdit(btn.dataset.ticker);
 });
 
-document.getElementById("holding-close").addEventListener("click", () => closeOverlays(false));
+document.getElementById("holding-close").addEventListener("click", () => closeTopOverlay(false));
 holdingOverlayEl.addEventListener("click", (e) => {
-  if (e.target.id === "holding-overlay") closeOverlays(false);
+  if (e.target.id === "holding-overlay") closeTopOverlay(false);
 });
+
+function refreshAfterHoldingChange() {
+  if (latestPayload) render();
+  renderManageList();
+  if (detailTicker) {
+    const pick = findPick(detailTicker);
+    if (pick) renderDetailHoldingSection(pick);
+  }
+}
 
 document.getElementById("holding-save-btn").addEventListener("click", () => {
   if (!holdingEditTicker) return;
   setHolding(holdingEditTicker, holdingSharesInput.value, holdingBuyPriceInput.value);
-  if (latestPayload) render();
-  renderManageList();
-  closeOverlays(false);
+  refreshAfterHoldingChange();
+  closeTopOverlay(false);
 });
 
 document.getElementById("holding-clear-btn").addEventListener("click", () => {
   if (!holdingEditTicker) return;
   if (!confirm("保有情報をクリアしますか?")) return;
   setHolding(holdingEditTicker, 0, null);
-  if (latestPayload) render();
-  renderManageList();
-  closeOverlays(false);
+  refreshAfterHoldingChange();
+  closeTopOverlay(false);
 });
 
 function updateSubtitleText() {
@@ -1353,12 +1405,11 @@ document.getElementById("settings-toggle-btn").addEventListener("click", () => {
   settingsReversalBadgeCheck.checked = s.showReversalBadge;
   settingsDrawdownInput.value = s.reversalMinDrawdownPct;
   settingsRecoveryInput.value = s.reversalMinRecoveryPct;
-  history.pushState({ settings: true }, "");
-  settingsOverlayEl.classList.add("open");
+  pushOverlay("settings-overlay");
 });
-document.getElementById("settings-close").addEventListener("click", () => closeOverlays(false));
+document.getElementById("settings-close").addEventListener("click", () => closeTopOverlay(false));
 settingsOverlayEl.addEventListener("click", (e) => {
-  if (e.target.id === "settings-overlay") closeOverlays(false);
+  if (e.target.id === "settings-overlay") closeTopOverlay(false);
 });
 document.getElementById("settings-save-btn").addEventListener("click", () => {
   const maxPrice = Number(settingsMaxPriceInput.value);
@@ -1382,7 +1433,7 @@ document.getElementById("settings-save-btn").addEventListener("click", () => {
   });
   updateSubtitleText();
   if (latestPayload) render();
-  closeOverlays(false);
+  closeTopOverlay(false);
 });
 
 const filterAllBtn = document.getElementById("filter-all-btn");
