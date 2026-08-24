@@ -1467,7 +1467,10 @@ addFormEl.addEventListener("submit", async (e) => {
   const raw = addTickerInput.value.trim();
   if (!raw) return;
 
-  const looksLikeTickerCode = /^[0-9a-z]{3,5}(\.t)?$/i.test(raw);
+  // JP ticker codes always start with a digit (e.g. 7203, or newer codes
+  // like 130A) — anything else (including short English words like "Sony")
+  // must go through the search-and-tap-a-result flow, never a direct add.
+  const looksLikeTickerCode = /^[0-9][0-9a-z]{2,4}(\.t)?$/i.test(raw);
   if (looksLikeTickerCode) {
     await runAddTicker(raw);
     return;
