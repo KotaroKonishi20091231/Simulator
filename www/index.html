@@ -315,12 +315,21 @@
   }
   #detail-overlay.open #detail-sheet { transform: translateY(0); }
   .sheet-handle {
+    width: 100%;
+    height: 32px;
+    margin: -8px 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    cursor: grab;
+  }
+  .sheet-handle::before {
+    content: "";
     width: 36px;
     height: 4px;
     background: var(--panel-border);
     border-radius: 999px;
-    margin: 0 auto 14px;
-    touch-action: none;
   }
   .detail-header {
     display: flex;
@@ -1251,6 +1260,21 @@ function setupSheetDrag(sheetEl) {
 ["detail-sheet", "manage-sheet", "holding-sheet", "settings-sheet"].forEach((id) => {
   setupSheetDrag(document.getElementById(id));
 });
+
+// The hardware/gesture back button on Android isn't wired to the WebView's
+// own history by default in a Capacitor app — without this, pressing back
+// just exits the app outright, ignoring any open sheet. The App plugin's
+// "backButton" event lets us route it through our own history stack instead:
+// close whatever's open first, and only exit once we're back at the list.
+if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+  window.Capacitor.Plugins.App.addListener("backButton", () => {
+    if (overlayStack.length > 0) {
+      history.back();
+    } else {
+      window.Capacitor.Plugins.App.exitApp();
+    }
+  });
+}
 
 const manageToggleBtn = document.getElementById("manage-toggle-btn");
 const manageOverlayEl = document.getElementById("manage-overlay");
